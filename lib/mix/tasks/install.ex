@@ -2,6 +2,7 @@ defmodule Mix.Tasks.Desktop.Install do
   @moduledoc "Installer Mix task for Elixir Desktop: `mix desktop.install`"
   use Mix.Task
 
+  @shortdoc "Setup ElixrDesktop app"
   def run(args) do
     {parsed_args, _, _} =
       OptionParser.parse(args, strict: [namespace: :string, os: :string, database: :string])
