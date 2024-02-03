@@ -18,7 +18,8 @@ defmodule Mix.Tasks.Desktop.Install do
     format_config_files()
 
     IO.puts("\nYour Phoenix app is ready to use ElixirDesktop!\n")
-    IO.puts("Platform-specific project files have been placed in the \"native\" directory\n")
+    IO.puts("\nStart your Desktop app with: \n \n $ iex -S mix\n")
+    # IO.puts("Platform-specific project files have been placed in the \"native\" directory\n")
     :ok
   end
 
