@@ -7,7 +7,11 @@ defmodule Mix.Tasks.Desktop.Install do
     {parsed_args, _, _} =
       OptionParser.parse(args, strict: [namespace: :string, os: :string, database: :string])
 
+    # Get all Mix tasks for Elixir Desktop client project
+    valid_mix_tasks = get_installer_mix_tasks()
     host_project_config = get_host_project_config(parsed_args)
+    run_all_install_tasks(valid_mix_tasks, host_project_config)
+
     # IO.inspect(host_project_config)
     update_config_exs_if_needed(host_project_config)
     update_endpoint_ex_if_needed(host_project_config)
@@ -15,13 +19,89 @@ defmodule Mix.Tasks.Desktop.Install do
     update_mix_exs_application_if_needed(host_project_config)
     update_mix_exs_deps_if_needed(host_project_config)
     rename_runtime_exs_if_needed(host_project_config)
-    # clean_build_path(host_project_config)
+    clean_build_path(host_project_config)
     format_config_files()
 
     IO.puts("\nYour Phoenix app is ready to use ElixirDesktop!\n")
     IO.puts("\nStart your Desktop app with: \n \n $ iex -S mix\n")
     # IO.puts("Platform-specific project files have been placed in the \"native\" directory\n")
     :ok
+  end
+
+  defp run_all_install_tasks(mix_tasks, host_project_config) do
+    mix_tasks
+    |> Enum.map(&prompt_task_settings/1)
+    |> Enum.map(&run_install_task(&1, host_project_config))
+  end
+
+  defp prompt_task_settings(%{client_name: client_name, prompts: [_ | _] = prompts} = task) do
+    prompts
+    |> Enum.reduce_while({:ok, task}, fn {prompt_key, prompt_settings}, {:ok, acc} ->
+      case prompt_task_setting(prompt_settings, client_name) do
+        {:error, message} ->
+          Owl.IO.puts([Owl.Data.tag("#{client_name}: #{message}", :yellow)])
+
+          {:halt, {:error, acc}}
+
+        result ->
+          settings = Map.get(acc, :settings, %{})
+          updated_settings = Map.put(settings, prompt_key, result)
+
+          {:cont, {:ok, Map.put(acc, :settings, updated_settings)}}
+      end
+    end)
+  end
+
+  defp prompt_task_setting(%{ignore: true}, _client_name), do: true
+
+  defp prompt_task_setting(%{type: :confirm, label: label} = task, client_name) do
+    if Owl.IO.confirm(message: "#{client_name}: #{label}", default: true) do
+      if is_function(task[:on_yes]), do: apply(task[:on_yes], [])
+    else
+      if is_function(task[:on_no]), do: apply(task[:on_no], [])
+    end
+  end
+
+  defp prompt_task_setting(
+         %{type: :multiselect, label: label, options: options, default: default} = task,
+         client_name
+       ) do
+    default_label = Map.get(task, :default_label, inspect(default))
+
+    case Owl.IO.multiselect(options,
+           label:
+             "#{client_name}: #{label} (Space-delimited, leave blank for default: #{default_label})"
+         ) do
+      [] ->
+        default || []
+
+      result ->
+        result
+    end
+  end
+
+  defp prompt_task_setting(_task, _client_name), do: nil
+
+  defp run_install_task(result, host_project_config) do
+    case result do
+      {:ok, %{client_name: client_name, mix_task: mix_task, settings: settings}} ->
+        Owl.IO.puts([Owl.Data.tag("* generating ", :green), "#{client_name} project files"])
+
+        mix_task.run(["--host-project-config", host_project_config, "--task-settings", settings])
+
+      _ ->
+        :skipped
+    end
+  end
+
+  defp get_installer_mix_tasks do
+    Mix.Task.load_all()
+    |> Enum.filter(&function_exported?(&1, :desktop_install_config, 0))
+    |> Enum.map(fn module ->
+      module
+      |> apply(:desktop_install_config, [])
+      |> Map.put(:mix_task, module)
+    end)
   end
 
   defp get_host_project_config(parsed_args) do
@@ -41,6 +121,7 @@ defmodule Mix.Tasks.Desktop.Install do
       app_namespace: namespace,
       build_path: build_path,
       current_path: current_path,
+      native_path: Path.join(current_path, "native"),
       libs_path: Path.join(build_path, "dev/lib"),
       mix_config_path: mix_config_path
     }

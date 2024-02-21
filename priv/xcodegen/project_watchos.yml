@@ -1,0 +1,10 @@
+targets:
+  "${DESKTOP_APP_NAME} Watch App":
+    type: application
+    platform: watchOS
+    sources:
+      - Sources/${DESKTOP_APP_NAME}
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: ${DESKTOP_BUNDLE_IDENTIFIER}.watchkit
+    dependencies:
+      - package: ZIPFoundation

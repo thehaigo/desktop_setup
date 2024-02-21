@@ -1,0 +1,45 @@
+#!/bin/bash
+set -e
+
+# Setting up the PATH environment
+[ -s /opt/homebrew/bin/brew ] && eval $(/opt/homebrew/bin/brew shellenv)
+[ -s /usr/local/bin/brew ] && eval $(/usr/local/bin/brew shellenv)
+
+# This loads nvm
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  
+
+# This loads asdf
+if [ -s "$HOMEBREW_PREFIX/opt/asdf/libexec/asdf.sh" ]; then 
+  \. "$HOMEBREW_PREFIX/opt/asdf/libexec/asdf.sh" 
+elif [ -s "$HOME/.asdf/asdf.sh" ]; then
+  \. "$HOME/.asdf/asdf.sh"
+fi
+
+BASE=`pwd`
+export MIX_ENV=prod
+export MIX_TARGET=ios
+
+mix local.hex --force --if-missing
+mix local.rebar --force --if-missing
+
+
+cd ../../
+
+if [ ! -d "deps/desktop" ]; then
+  mix deps.get
+fi
+
+#if [ ! -d "assets/node_modules" ]; then
+#  cd assets && npm i && cd ..
+#fi
+
+if [ -f "$BASE/TemplateApp/app.zip" ]; then
+  rm "$BASE/TemplateApp/app.zip"
+fi
+
+mix assets.deploy && \
+  mix release --overwrite && \
+  cd _build/ios_prod/rel/template_app && \
+  zip -9r "$BASE/TemplateApp/app.zip" lib/ releases/ --exclude "*.so"  
+

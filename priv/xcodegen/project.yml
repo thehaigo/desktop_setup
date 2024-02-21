@@ -1,0 +1,31 @@
+name: ${DESKTOP_APP_NAME}
+include:
+  - path: base_spec.yml
+    relativePaths: false
+  - path: ${DESKTOP_WATCHOS_INCLUDE_PATH}
+    relativePaths: false
+targets:
+  ${DESKTOP_APP_NAME}:
+    type: application
+    supportedDestinations:
+      - ${DESKTOP_IOS}
+      - ${DESKTOP_MACOS}
+      - ${DESKTOP_TVOS}
+    sources:
+      - ${DESKTOP_APP_NAME}
+      - native-lib.cpp
+      - native-lib.hpp
+      - example-Bridging-Header.h
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: ${DESKTOP_BUNDLE_IDENTIFIER}
+      SWIFT_OBJC_BRIDGING_HEADER: example-Bridging-Header.h
+    dependencies:
+      - framework: "Carthage/Build/ZIPFoundation.xcframework"
+        embed: false
+      - framework: liberlang.xcframework
+        embed: false
+    postBuildScripts:
+      - name: build elixir
+        runOnlyWhenInstalling: false
+        path: postscript.sh
+        shell: /bin/sh
