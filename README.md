@@ -5,6 +5,15 @@ https://github.com/elixir-desktop/desktop
 
 
 
+## Requirements
+Using Erlang version 26.2 for iOS and Android
+Therefore, the build environment must be the same
+
+```
+asdf install erlang 26.2
+asdf install elixir 1.16.0-otp-26
+```
+
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
@@ -26,15 +35,24 @@ mix desktop.install
 ```
  
 
+## iOS build
+```
+cd native/ios
+./run_mix
+open [your app name].xcodeproj
+```
+
+
 ## Roadmap
 
 - [x] Dektop app setup
-- [ ] iOS App setup
+- [x] iOS App setup
 - [ ] Android App setup
 
 
 ## Use PostgreSQL at iOS and Android app in Develop
 If you use postgresql, add the following to config/prod.exs
+
 ```
 config :[your app name], [your app module name].Repo,
   username: "postgres",
