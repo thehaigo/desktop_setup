@@ -38,9 +38,12 @@ mix desktop.install
 ## iOS build
 ```
 cd native/ios
-./run_mix
 open [your app name].xcodeproj
 ```
+build from Xcode 
+
+if happen build error
+try `./run_mix` at console
 
 
 ## Roadmap
