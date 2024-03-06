@@ -12,12 +12,14 @@ defmodule Mix.Tasks.Setup.SwiftUI do
     host_project_config = Keyword.fetch!(parsed_args, :host_project_config)
     task_settings = Keyword.fetch!(parsed_args, :task_settings)
 
-    make_native_project_dir(host_project_config)
-    copy_xcodegen_files(host_project_config)
-    prepare_source_files(host_project_config)
-    rename_sources_directory(host_project_config)
-    run_xcodegen(host_project_config, task_settings)
-    remove_xcodegen_files(host_project_config)
+    if !File.exists?(host_project_config.native_path <> "/ios") do
+      make_native_project_dir(host_project_config)
+      copy_xcodegen_files(host_project_config)
+      prepare_source_files(host_project_config)
+      rename_sources_directory(host_project_config)
+      run_xcodegen(host_project_config, task_settings)
+      remove_xcodegen_files(host_project_config)
+    end
 
     :ok
   end
