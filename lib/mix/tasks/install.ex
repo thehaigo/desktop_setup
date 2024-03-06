@@ -163,7 +163,8 @@ defmodule Mix.Tasks.Desktop.Install do
   defp update_config_exs_if_needed(%{app_config_path: path}) do
     # Update project's config.exs to modified for desktop if needed.
     replace_string = "http: [ip: {127, 0, 0, 1}, port: 10_000 + :rand.uniform(45_000)],"
-    full_replace_string = Enum.join([replace_string, "\n", " server: true,", "\n"])
+    full_replace_string = Enum.join(
+      [replace_string, "\n", " server: true,", "\n", "secret_key_base: :crypto.strong_rand_bytes(32),", "\n"])
     {:ok, app_config_body} = File.read(path)
 
     if String.contains?(app_config_body, replace_string) do
