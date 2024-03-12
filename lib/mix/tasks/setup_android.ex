@@ -9,31 +9,20 @@ defmodule Mix.Tasks.Setup.Android do
     {parsed_args, _, _} =
       OptionParser.parse(args, strict: [host_project_config: :string, task_settings: :string])
 
-    host_project_config = Keyword.fetch!(parsed_args, :host_project_config)
-    # task_settings = Keyword.fetch!(parsed_args, :task_settings)
+    host_project_config = Util.get_host_project_config(parsed_args)
+    Owl.IO.puts([Owl.Data.tag("* generating ", :green), "Android project files"])
 
-    make_native_project_dir(host_project_config)
-    copy_android_files(host_project_config)
-    prepare_source_files(host_project_config)
-    rename_sources_directory(host_project_config)
+    if !File.exists?(host_project_config.native_path <> "/android") do
+      make_native_project_dir(host_project_config)
+      copy_android_files(host_project_config)
+      prepare_source_files(host_project_config)
+      rename_sources_directory(host_project_config)
+    else
+      IO.puts("Android Project already created, skipping...")
+    end
 
     :ok
   end
-
-  def desktop_install_config,
-    do: %{
-      client_name: "Android",
-      prompts: [
-        install_xcodegen: %{
-          type: :confirm,
-          label:
-            "Xcodegen is required to generate an Xcode project for your app. Would you like to install it?",
-          ignore: true,
-          on_yes: &File.ls/0,
-          on_no: &File.ls/0
-        }
-      ]
-    }
 
   defp make_native_project_dir(%{native_path: native_path}) do
     native_path

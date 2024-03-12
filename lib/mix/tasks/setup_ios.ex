@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Setup.SwiftUI do
+defmodule Mix.Tasks.Setup.Ios do
   @moduledoc "Installer Mix task for LiveView Native: `mix desktop.install`"
   use Mix.Task
 
@@ -9,20 +9,71 @@ defmodule Mix.Tasks.Setup.SwiftUI do
     {parsed_args, _, _} =
       OptionParser.parse(args, strict: [host_project_config: :string, task_settings: :string])
 
-    host_project_config = Keyword.fetch!(parsed_args, :host_project_config)
-    task_settings = Keyword.fetch!(parsed_args, :task_settings)
+    desktop_install_config() |> prompt_task_settings()
+    Owl.IO.puts([Owl.Data.tag("* generating ", :green), "iOS project files"])
+    host_project_config = Util.get_host_project_config(parsed_args)
 
     if !File.exists?(host_project_config.native_path <> "/ios") do
       make_native_project_dir(host_project_config)
       copy_xcodegen_files(host_project_config)
       prepare_source_files(host_project_config)
       rename_sources_directory(host_project_config)
-      run_xcodegen(host_project_config, task_settings)
+      run_xcodegen(host_project_config, %{})
       remove_xcodegen_files(host_project_config)
+    else
+      IO.puts("iOS Project already created, skipping...")
     end
 
     :ok
   end
+
+  defp prompt_task_settings(%{client_name: client_name, prompts: [_ | _] = prompts} = task) do
+    prompts
+    |> Enum.reduce_while({:ok, task}, fn {prompt_key, prompt_settings}, {:ok, acc} ->
+      case prompt_task_setting(prompt_settings, client_name) do
+        {:error, message} ->
+          Owl.IO.puts([Owl.Data.tag("#{client_name}: #{message}", :yellow)])
+
+          {:halt, {:error, acc}}
+
+        result ->
+          settings = Map.get(acc, :settings, %{})
+          updated_settings = Map.put(settings, prompt_key, result)
+
+          {:cont, {:ok, Map.put(acc, :settings, updated_settings)}}
+      end
+    end)
+  end
+
+  defp prompt_task_setting(%{ignore: true}, _client_name), do: true
+
+  defp prompt_task_setting(%{type: :confirm, label: label} = task, client_name) do
+    if Owl.IO.confirm(message: "#{client_name}: #{label}", default: true) do
+      if is_function(task[:on_yes]), do: apply(task[:on_yes], [])
+    else
+      if is_function(task[:on_no]), do: apply(task[:on_no], [])
+    end
+  end
+
+  defp prompt_task_setting(
+         %{type: :multiselect, label: label, options: options, default: default} = task,
+         client_name
+       ) do
+    default_label = Map.get(task, :default_label, inspect(default))
+
+    case Owl.IO.multiselect(options,
+           label:
+             "#{client_name}: #{label} (Space-delimited, leave blank for default: #{default_label})"
+         ) do
+      [] ->
+        default || []
+
+      result ->
+        result
+    end
+  end
+
+  defp prompt_task_setting(_task, _client_name), do: nil
 
   def desktop_install_config,
     do: %{
@@ -35,11 +86,17 @@ defmodule Mix.Tasks.Setup.SwiftUI do
           ignore: System.find_executable("xcodegen") != nil,
           on_yes: &install_xcodegen/0,
           on_no: &skip_swiftui_install/0
+        },
+        install_carthage: %{
+          type: :confirm,
+          label:
+            "Carthage is required to setup an Xcode project for your app. Would you like to install it?",
+          ignore: System.find_executable("carthage") != nil,
+          on_yes: &install_carthage/0,
+          on_no: &skip_carthage_install/0
         }
       ]
     }
-
-  ###
 
   defp install_xcodegen do
     cond do
@@ -65,6 +122,22 @@ defmodule Mix.Tasks.Setup.SwiftUI do
           "https://github.com/yonaskolb/XcodeGen.git",
           "_build/tmp/xcodegen"
         ])
+
+        true
+    end
+  end
+
+  defp install_carthage do
+    cond do
+      # Install with Homebrew
+      System.find_executable("brew") ->
+        status_message("running", "brew install carthage")
+        System.cmd("brew", ["install", "carthage"])
+        true
+
+      # Clone from GitHub (fallback)
+      true ->
+        skip_carthage_install()
 
         true
     end
@@ -98,7 +171,7 @@ defmodule Mix.Tasks.Setup.SwiftUI do
     |> Enum.map(&prepare_source_file(&1, host_project_config))
   end
 
-  defp prepare_source_file(source_file, %{} = task_settings) do
+  defp prepare_source_file(source_file, task_settings) do
     body =
       source_file
       |> File.read!()
@@ -189,6 +262,10 @@ defmodule Mix.Tasks.Setup.SwiftUI do
 
   defp skip_swiftui_install do
     {:error,
-     "Skipping Xcode project generation due to missing Xcodegen installation. Please create one manually at native/swiftui."}
+     "Skipping Xcode project generation due to missing Xcodegen installation. Please create one manually at native/ios."}
+  end
+
+  defp skip_carthage_install do
+    {:error, "Skipping install Carthage. Please install Carthage yourself"}
   end
 end

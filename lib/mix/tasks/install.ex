@@ -8,9 +8,9 @@ defmodule Mix.Tasks.Desktop.Install do
       OptionParser.parse(args, strict: [namespace: :string, os: :string, database: :string])
 
     # Get all Mix tasks for Elixir Desktop client project
-    valid_mix_tasks = get_installer_mix_tasks()
-    host_project_config = get_host_project_config(parsed_args)
-    run_all_install_tasks(valid_mix_tasks, host_project_config)
+    # valid_mix_tasks = get_installer_mix_tasks()
+    host_project_config = Util.get_host_project_config(parsed_args)
+    # run_all_install_tasks(valid_mix_tasks, host_project_config)
 
     # IO.inspect(host_project_config)
     update_config_exs_if_needed(host_project_config)
@@ -28,143 +28,20 @@ defmodule Mix.Tasks.Desktop.Install do
     :ok
   end
 
-  defp run_all_install_tasks(mix_tasks, host_project_config) do
-    mix_tasks
-    |> Enum.map(&prompt_task_settings/1)
-    |> Enum.map(&run_install_task(&1, host_project_config))
-  end
-
-  defp prompt_task_settings(%{client_name: client_name, prompts: [_ | _] = prompts} = task) do
-    prompts
-    |> Enum.reduce_while({:ok, task}, fn {prompt_key, prompt_settings}, {:ok, acc} ->
-      case prompt_task_setting(prompt_settings, client_name) do
-        {:error, message} ->
-          Owl.IO.puts([Owl.Data.tag("#{client_name}: #{message}", :yellow)])
-
-          {:halt, {:error, acc}}
-
-        result ->
-          settings = Map.get(acc, :settings, %{})
-          updated_settings = Map.put(settings, prompt_key, result)
-
-          {:cont, {:ok, Map.put(acc, :settings, updated_settings)}}
-      end
-    end)
-  end
-
-  defp prompt_task_setting(%{ignore: true}, _client_name), do: true
-
-  defp prompt_task_setting(%{type: :confirm, label: label} = task, client_name) do
-    if Owl.IO.confirm(message: "#{client_name}: #{label}", default: true) do
-      if is_function(task[:on_yes]), do: apply(task[:on_yes], [])
-    else
-      if is_function(task[:on_no]), do: apply(task[:on_no], [])
-    end
-  end
-
-  defp prompt_task_setting(
-         %{type: :multiselect, label: label, options: options, default: default} = task,
-         client_name
-       ) do
-    default_label = Map.get(task, :default_label, inspect(default))
-
-    case Owl.IO.multiselect(options,
-           label:
-             "#{client_name}: #{label} (Space-delimited, leave blank for default: #{default_label})"
-         ) do
-      [] ->
-        default || []
-
-      result ->
-        result
-    end
-  end
-
-  defp prompt_task_setting(_task, _client_name), do: nil
-
-  defp run_install_task(result, host_project_config) do
-    case result do
-      {:ok, %{client_name: client_name, mix_task: mix_task, settings: settings}} ->
-        Owl.IO.puts([Owl.Data.tag("* generating ", :green), "#{client_name} project files"])
-
-        mix_task.run(["--host-project-config", host_project_config, "--task-settings", settings])
-
-      _ ->
-        :skipped
-    end
-  end
-
-  defp get_installer_mix_tasks do
-    Mix.Task.load_all()
-    |> Enum.filter(&function_exported?(&1, :desktop_install_config, 0))
-    |> Enum.map(fn module ->
-      module
-      |> apply(:desktop_install_config, [])
-      |> Map.put(:mix_task, module)
-    end)
-  end
-
-  defp get_host_project_config(parsed_args) do
-    # Define some paths for the host project
-    current_path = File.cwd!()
-    mix_config_path = Path.join(current_path, "mix.exs")
-    build_path = Path.join(current_path, "_build")
-    namespace = parsed_args[:namespace] || infer_app_namespace(mix_config_path)
-    app_name = Macro.underscore(namespace)
-
-    %{
-      app_name: app_name,
-      app_config_path: Path.join(current_path, "config/config.exs"),
-      runtime_path: Path.join(current_path, "config/runtime.exs"),
-      application_path: Path.join(current_path, "lib/#{app_name}.ex"),
-      endpoint_path: Path.join(current_path, "lib/#{app_name}_web/endpoint.ex"),
-      app_namespace: namespace,
-      build_path: build_path,
-      current_path: current_path,
-      native_path: Path.join(current_path, "native"),
-      libs_path: Path.join(build_path, "dev/lib"),
-      mix_config_path: mix_config_path
-    }
-  end
-
-  def infer_app_namespace(config_path) do
-    with {:ok, config} <- File.read(config_path),
-         {:ok, mix_project_ast} <- Code.string_to_quoted(config),
-         {:ok, namespace} <- find_mix_project_namespace(mix_project_ast) do
-      "#{namespace}"
-    else
-      _ ->
-        raise "Could not infer Mix project namespace from mix.exs. Please provide it manually using the --namespace argument."
-    end
-  end
-
-  defp find_mix_project_namespace(ast) do
-    case ast do
-      ast when is_list(ast) ->
-        ast
-        |> Enum.reduce_while({:error, :cannot_infer_app_name}, fn node, _acc ->
-          {status, result} = find_mix_project_namespace(node)
-          acc_op = if status == :ok, do: :halt, else: :cont
-
-          {acc_op, {status, result}}
-        end)
-
-      {:defmodule, _, [{:__aliases__, _, [namespace, :MixProject]} | _rest]} ->
-        {:ok, namespace}
-
-      {:__block__, _, contents} ->
-        find_mix_project_namespace(contents)
-
-      _ ->
-        {:error, :cannot_infer_app_name}
-    end
-  end
-
   defp update_config_exs_if_needed(%{app_config_path: path}) do
     # Update project's config.exs to modified for desktop if needed.
     replace_string = "http: [ip: {127, 0, 0, 1}, port: 10_000 + :rand.uniform(45_000)],"
-    full_replace_string = Enum.join(
-      [replace_string, "\n", " server: true,", "\n", "secret_key_base: :crypto.strong_rand_bytes(32),", "\n"])
+
+    full_replace_string =
+      Enum.join([
+        replace_string,
+        "\n",
+        " server: true,",
+        "\n",
+        "secret_key_base: :crypto.strong_rand_bytes(32),",
+        "\n"
+      ])
+
     {:ok, app_config_body} = File.read(path)
 
     if String.contains?(app_config_body, replace_string) do
