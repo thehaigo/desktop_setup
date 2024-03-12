@@ -12,6 +12,7 @@ Therefore, the build environment must be the same
 ```
 asdf install erlang 26.2
 asdf install elixir 1.16.2-otp-26
+brew install carthage xcodegen
 ```
 
 Android
