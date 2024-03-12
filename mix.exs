@@ -9,7 +9,7 @@ defmodule DesktopSetup.MixProject do
       app: :desktop_setup,
       version: @version,
       description: "Setup Library for Multiplatform Dev kit ElixirDesktop",
-      elixir: "~> 1.16",
+      elixir: "~> 1.15",
       package: package(),
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: Mix.compilers(),
