@@ -1,10 +1,10 @@
-defmodule Mix.Tasks.Setup.Ios do
-  @moduledoc "Installer Mix task for LiveView Native: `mix desktop.install`"
+defmodule Mix.Tasks.Desktop.Setup.Ios do
+  @moduledoc "Installer Mix task for ElixirDesktop: `mix desktop.setup.ios`"
   use Mix.Task
 
   @requirements ["app.config"]
 
-  @shortdoc "Installs ElixirDesktop for SwiftUI."
+  @shortdoc "Setup ElixirDesktop for iOS."
   def run(args) do
     {parsed_args, _, _} =
       OptionParser.parse(args, strict: [host_project_config: :string, task_settings: :string])
