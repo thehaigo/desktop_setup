@@ -101,6 +101,37 @@ if Mix.target() == :android do
 end
 ```
 
+## Sqlite Migration at Native Device
+
+copy from prive/repo/migrations to lib/migrations
+and rename exs to ex
+```
+mkdir lib/migrations
+cp priv/repo/migrations/[migration file].exs lib/migrations/[migration file].ex
+```
+
+rename module name(remove Repo.)
+
+```
+defmodule [your app module name].Migrations.Create[table name] do
+...
+end
+```
+
+add migration module name
+
+```lib/[your app name]/repo.ex
+defmodule [your app module name].Repo do
+  use Ecto.Repo,
+    otp_app: :[your app name],
+    adapter: Ecto.Adapters.SQLite3
+
+  def migration() do
+    Ecto.Migrator.up([your app module name].Repo, [timestamp from filename],[your app module name].Repo.Migrations.Create[table name])
+  end
+end
+```
+
 
 
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
