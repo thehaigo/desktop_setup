@@ -133,9 +133,10 @@ end
 ```
 
 
-## trouble shoot
+# trouble shoot
 
-### no ZIPFounfdation(iOS)
+## no ZIPFounfdation(iOS)
+
 ```
 There is no XCFramework found at 'ios/Carthage/Build/ZIPFoundation.xcframework'.
 ```
@@ -151,6 +152,11 @@ carthage update --platform iOS --use-xcframeworks
 Sandbox: bash(39046) deny(1) file-read-data 
 ```
 
+1. open xcode genereted ios project
+2. select Build Settings
+3. Build Options -> User Script Sandboxins -> Yes
+
+
 ## build script permisson denied(WSL2 Android)
 
 ```
@@ -162,15 +168,6 @@ access to /dev/kvm
 ```
 sudo chown $USER /dev/kvm
 ```
-
-
-1. open xcode genereted ios project
-2. select Build Settings
-3. Build Options -> User Script Sandboxins -> Yes
-
-
-
-
 
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
