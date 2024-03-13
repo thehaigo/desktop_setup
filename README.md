@@ -127,10 +127,48 @@ defmodule [your app module name].Repo do
     adapter: Ecto.Adapters.SQLite3
 
   def migration() do
-    Ecto.Migrator.up([your app module name].Repo, [timestamp from filename],[your app module name].Repo.Migrations.Create[table name])
+    Ecto.Migrator.up([your app module name].Repo, [timestamp from filename],[your app module name].Migrations.Create[table name])
   end
 end
 ```
+
+
+## trouble shoot
+
+### no ZIPFounfdation(iOS)
+```
+There is no XCFramework found at 'ios/Carthage/Build/ZIPFoundation.xcframework'.
+```
+
+```
+cd native/ios
+carthage update --platform iOS --use-xcframeworks
+```
+
+## can't run build script(iOS)
+
+```
+Sandbox: bash(39046) deny(1) file-read-data 
+```
+
+## build script permisson denied(WSL2 Android)
+
+```
+Error running 'app'
+/dev/kvm device: permission denied. Grant current user
+access to /dev/kvm
+```
+
+```
+sudo chown $USER /dev/kvm
+```
+
+
+1. open xcode genereted ios project
+2. select Build Settings
+3. Build Options -> User Script Sandboxins -> Yes
+
+
 
 
 
