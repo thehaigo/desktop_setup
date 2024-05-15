@@ -1,6 +1,7 @@
 ## User settings
 xcuserdata/
 
+Carthage
 ## Xcode 8 and earlier
 *.xcscmblueprint
 *.xccheckout
