@@ -9,8 +9,6 @@ targets:
     type: application
     supportedDestinations:
       - ${DESKTOP_IOS}
-      - ${DESKTOP_MACOS}
-      - ${DESKTOP_TVOS}
     sources:
       - ${DESKTOP_APP_NAME}
       - native-lib.cpp
@@ -21,7 +19,7 @@ targets:
       SWIFT_OBJC_BRIDGING_HEADER: example-Bridging-Header.h
     dependencies:
       - framework: "Carthage/Build/ZIPFoundation.xcframework"
-        embed: false
+        embed: true
       - framework: liberlang.xcframework
         embed: false
     postBuildScripts:

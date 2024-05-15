@@ -3,7 +3,7 @@ options:
   groupSortPosition: top
   generateEmptyDirectories: true
   deploymentTarget: 
-    iOS: "16.0"
+    iOS: "17.4"
     watchOS: "9.0"
     tvOS: "16.0"
     macOS: "13.0"
