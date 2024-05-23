@@ -25,5 +25,6 @@ targets:
     postBuildScripts:
       - name: build elixir
         runOnlyWhenInstalling: false
+        basedOnDependencyAnalysis: false
         path: postscript.sh
         shell: /bin/sh
