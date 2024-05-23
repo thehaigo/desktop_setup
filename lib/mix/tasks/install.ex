@@ -133,7 +133,7 @@ defmodule Mix.Tasks.Desktop.Install do
         config_body
         |> String.replace(
           ~r/defp deps do\n    \[\n/,
-          "defp deps do\n    \[\n       {:desktop, \"~> 1.5\"}, \n{:wx, \"~> 1.1\", hex: :bridge, targets: [:android, :ios]},\n#{if database == :sqlite, do: "{:exqlite, github: \"elixir-desktop/exqlite\", override: true},\n", else: ""}"
+          "defp deps do\n    \[\n       {:desktop, \"~> 1.5\"}, \n{:wx, \"~> 1.1\", hex: :bridge, targets: [:android, :ios]},\n {:plug_crypto, github: \"thehaigo/plug_crypto\", override: true},\n #{if database == :sqlite, do: "{:exqlite, github: \"elixir-desktop/exqlite\", override: true},\n", else: ""}"
         )
 
       IO.binwrite(app_config, updated_config_body)
