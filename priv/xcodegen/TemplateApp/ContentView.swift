@@ -19,9 +19,6 @@ struct ContentView: View {
                 ZStack {
                     Color(red: 47/255, green: 36/255, blue: 58/255)
                         .ignoresSafeArea()
-                    Image("Logo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
                 }
             }
         }
