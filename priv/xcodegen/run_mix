@@ -16,6 +16,9 @@ elif [ -s "$HOME/.asdf/asdf.sh" ]; then
   \. "$HOME/.asdf/asdf.sh"
 fi
 
+asdf local erlang 26.2
+asdf local elixir 1.16.2-otp-26
+
 BASE=`pwd`
 export MIX_ENV=prod
 export MIX_TARGET=ios

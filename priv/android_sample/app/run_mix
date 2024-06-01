@@ -6,6 +6,9 @@ APP_FILE="$BASE/src/main/assets/app.zip"
 export MIX_ENV=prod
 export MIX_TARGET=android
 
+asdf local erlang 25.0.4
+asdf local elixir 1.16.2-otp-25
+
 
 cd ../../../
 
