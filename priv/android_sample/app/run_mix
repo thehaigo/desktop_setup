@@ -6,11 +6,10 @@ APP_FILE="$BASE/src/main/assets/app.zip"
 export MIX_ENV=prod
 export MIX_TARGET=android
 
+cd ../../../
+
 asdf local erlang 25.0.4
 asdf local elixir 1.16.2-otp-25
-
-
-cd ../../../
 
 if [ ! -d "deps/desktop" ]; then
   mix local.hex --force
