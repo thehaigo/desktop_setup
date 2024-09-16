@@ -65,21 +65,41 @@ defmodule Mix.Tasks.Desktop.Setup.Android do
   end
 
   defp prepare_source_file(source_file, %{} = task_settings) do
+    replace_name =
+      if Path.basename(source_file) == "run_mix" do
+        task_settings.app_name
+      else
+        String.replace(task_settings.app_name, "_", "")
+      end
+
     body =
       source_file
       |> File.read!()
       |> String.replace("TemplateApp", task_settings.app_namespace)
-      |> String.replace("template_app", task_settings.app_name)
+      |> String.replace("template_app", replace_name)
 
     File.write!(source_file, body)
   end
 
-  defp rename_sources_directory(%{app_namespace: app_namespace, native_path: native_path}) do
-    sources_path = Path.join(native_path, "android")
-    basename = Path.basename(sources_path)
-    dirname = Path.dirname(sources_path)
-    new_sources_path = Path.join(dirname, String.replace(basename, "TemplateApp", app_namespace))
+  defp rename_sources_directory(%{app_name: app_name, native_path: native_path}) do
+    source_path = Path.join(native_path, "android")
 
-    File.rename(sources_path, new_sources_path)
+    [
+      "app/src/androidTest/java/com/example/template_app",
+      "app/src/main/java/com/example/template_app",
+      "app/src/test/java/com/example/template_app"
+    ]
+    |> Enum.map(&Path.join(source_path, &1))
+    |> Enum.map(&rename_sources_directory(&1, String.replace(app_name, "_", "")))
+  end
+
+  defp rename_sources_directory(source_path, namespace) do
+    basename = Path.basename(source_path)
+    dirname = Path.dirname(source_path)
+
+    new_sources_path =
+      Path.join(dirname, String.replace(basename, "template_app", namespace))
+
+    File.rename(source_path, new_sources_path)
   end
 end
