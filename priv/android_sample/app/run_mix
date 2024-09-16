@@ -8,8 +8,8 @@ export MIX_TARGET=android
 
 cd ../../../
 
-asdf local erlang 25.0.4
-asdf local elixir 1.16.2-otp-25
+asdf local erlang 26.2.5
+asdf local elixir 1.17.2-otp-26
 
 if [ ! -d "deps/desktop" ]; then
   mix local.hex --force
