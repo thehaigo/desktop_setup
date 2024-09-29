@@ -193,6 +193,7 @@ defmodule Mix.Tasks.Desktop.Install do
         children = [
           #{repo}
           {Phoenix.PubSub, name: #{app_namespace}.PubSub},
+          {Finch, name: #{app_namespace}.Finch},
           #{app_namespace}Web.Endpoint
         ]
 
