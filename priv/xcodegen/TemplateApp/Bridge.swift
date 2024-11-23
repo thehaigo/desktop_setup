@@ -99,7 +99,16 @@ class Bridge {
     }
 
     static func port() -> NWEndpoint.Port {
-        return NWEndpoint.Port("23115")!
+        let value = UserDefaults.standard.string(forKey: "port")
+        let port: String
+        if value == nil {
+            port = String(20000 + Int.random(in: 1...20000))
+            UserDefaults.standard.set(port, forKey: "port")
+        } else {
+            port = value!
+        }
+        
+        return NWEndpoint.Port(port)!
     }
     
     func setEnv(name: String, value: String) {
