@@ -22,7 +22,7 @@ targets:
         embed: true
       - framework: liberlang.xcframework
         embed: false
-    postBuildScripts:
+    postCompileScripts:
       - name: build elixir
         runOnlyWhenInstalling: false
         basedOnDependencyAnalysis: false
