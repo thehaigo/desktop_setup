@@ -176,9 +176,21 @@ defmodule Mix.Tasks.Desktop.Install do
     """
     defmodule #{app_namespace} do
       use Application
-
+      @env Mix.env()
       def config_dir() do
-        Path.join([Desktop.OS.home(), ".config", "#{app_name}"])
+        case(@env) do
+          :test ->
+            "tmp"
+
+          _ ->
+            {path, _} =
+              Code.eval_string("Path.join([Desktop.OS.home(), dir, app])",
+                dir: ".config",
+                app: "#{app_name}"
+              )
+
+            path
+        end
       end
 
       @app Mix.Project.config()[:app]
