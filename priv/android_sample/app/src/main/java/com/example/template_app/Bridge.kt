@@ -105,7 +105,7 @@ class Bridge(private val applicationContext : Context, private var webview : Web
             val packageInfo = applicationContext.packageManager
                 .getPackageInfo(applicationContext.packageName, 0)
 
-            val nativeDir = packageInfo.applicationInfo.nativeLibraryDir
+            val nativeDir = packageInfo.applicationInfo?.nativeLibraryDir
             val lastUpdateTime = (packageInfo.lastUpdateTime / 1000).toString()
 
             val releaseDir = applicationContext.filesDir.absolutePath + "/app"

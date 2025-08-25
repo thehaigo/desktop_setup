@@ -1,0 +1,27 @@
+{
+  "buildFiles": [
+    "/Users/shou/phoenix/template_app/native/app/src/main/cpp/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/shou/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/shou/phoenix/template_app/native/app/.cxx/Debug/21k235gl/x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/shou/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/shou/phoenix/template_app/native/app/.cxx/Debug/21k235gl/x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "template_app::@6890427a1f51a3e7e1df": {
+      "artifactName": "template_app",
+      "abi": "x86",
+      "output": "/Users/shou/phoenix/template_app/native/app/build/intermediates/cxx/Debug/21k235gl/obj/x86/libtemplate_app.so",
+      "runtimeFiles": []
+    }
+  }
+}

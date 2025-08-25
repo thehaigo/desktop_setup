@@ -1,0 +1,1 @@
+/Users/shou/phoenix/template_app/native/app/src/main/cpp/CMakeLists.txt

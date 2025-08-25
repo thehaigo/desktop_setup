@@ -13,8 +13,6 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 
 
-
-
 class MainActivity : Activity() {
     private lateinit var binding: ActivityMainBinding
 

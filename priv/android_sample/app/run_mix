@@ -1,5 +1,5 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 BASE=`pwd`
 APP_FILE="$BASE/src/main/assets/app.zip"
@@ -8,25 +8,45 @@ export MIX_TARGET=android
 
 cd ../../../
 
-asdf set erlang 26.2.5
-asdf set elixir 1.17.2-otp-26
 
-if [ ! -d "deps/desktop" ]; then
-  mix local.hex --force
-  mix local.rebar
-  mix deps.get
-fi
+asdf set -u erlang 26.2.5
+asdf set -u elixir 1.17.2-otp-26
 
-#if [ ! -d "assets/node_modules" ]; then
-#  cd assets && npm i && cd ..
-#fi
 
-if [ -f "$APP_FILE" ]; then
-  rm "$APP_FILE"
-fi
+export PATH="$HOME/.asdf/shims:$HOME/.asdf/bin:$PATH"
 
-mix assets.deploy && \
-  mix release --overwrite && \
-  cd "_build/${MIX_TARGET}_${MIX_ENV}/rel/template_app" && \
-  zip -9r "$APP_FILE" lib/ releases/ --exclude "*.so"
+
+STRIP_SHIM_DIR="$(mktemp -d)"
+cat > "${STRIP_SHIM_DIR}/strip" <<'EOS'
+#!/usr/bin/env bash
+# no-op strip to avoid breaking ELF .so on macOS
+exit 0
+EOS
+chmod +x "${STRIP_SHIM_DIR}/strip"
+export PATH="${STRIP_SHIM_DIR}:$PATH"
+export STRIP=/usr/bin/true
+export DEVELOPER_DIR=""
+
+#mkdir -p "$(dirname "$APP_FILE")"
+#rm -f "$APP_FILE"
+
+#cd "$ELIXIR_DIR"
+
+
+#rm -rf _build
+mix do local.hex --force, local.rebar --force
+mix deps.get
+
+# (cd assets && npm ci && npm run build)
+
+mix assets.deploy
+mix release --overwrite
+
+REL_DIR="_build/${MIX_TARGET}_${MIX_ENV}/rel/template_app"
+[ -d "$REL_DIR" ] || { echo "Release dir not found: $REL_DIR"; exit 1; }
+
+TMP_DIR="$(mktemp -d)"
+rsync -a "$REL_DIR/" "$TMP_DIR/"
+chmod -R u+w "$TMP_DIR"
+( cd "$TMP_DIR" && zip -9r "$APP_FILE" lib/ releases/ --exclude "*.so" )
 
