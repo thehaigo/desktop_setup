@@ -1,0 +1,38 @@
+{
+  "buildFiles": [
+    "/Users/shou/phoenix/template_app/native/app/src/main/cpp/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/shou/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/shou/phoenix/template_app/native/app/.cxx/Debug/21k235gl/x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/shou/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/shou/phoenix/template_app/native/app/.cxx/Debug/21k235gl/x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "template_app::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "template_app",
+      "output": "/Users/shou/phoenix/template_app/native/app/build/intermediates/cxx/Debug/21k235gl/obj/x86/libtemplate_app.so",
+      "runtimeFiles": []
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/Users/shou/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/Users/shou/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}

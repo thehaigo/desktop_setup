@@ -1,25 +1,39 @@
 plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
     namespace 'com.example.template_app'
-    compileSdk 33
+    compileSdk 36
 
-    task buildNum(type: Exec, description: 'Update Elixir App') {
-        commandLine './run_mix', 'package.mobile'
+    tasks.register("buildNum", Exec) {
+        workingDir project.projectDir
+
+        // bash 経由で実行（相対パスの事故回避）
+        commandLine "/bin/bash", "$projectDir/run_mix"
+        def home = System.getProperty("user.home")
+        environment "PATH", [
+                "/opt/homebrew/bin",
+                "/usr/local/bin",
+                "${home}/.asdf/shims",
+                "${home}/.asdf/bin",
+                System.getenv("PATH")
+        ].join(":")
+        environment "MIX_ENV", "prod"
+        environment "MIX_TARGET", "android"
     }
 
-    tasks.withType(JavaCompile) {
-        compileTask -> compileTask.dependsOn buildNum
+    plugins.withId("com.android.application") {
+        tasks.named("preBuild").configure {
+            dependsOn(tasks.named("buildNum"))
+        }
     }
-
 
     defaultConfig {
         applicationId "com.example.template_app"
-        minSdk 29
-        targetSdk 33
+        minSdk 23
+        targetSdk 36
         versionCode 1
         versionName "1.0"
 
@@ -42,12 +56,13 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = '1.8'
-    }
+
+    kotlin { jvmToolchain(17) }
+
+
     externalNativeBuild {
         cmake {
             path file('src/main/cpp/CMakeLists.txt')
@@ -57,7 +72,7 @@ android {
     buildFeatures {
         viewBinding true
     }
-    packagingOptions {
+    packaging {
         jniLibs {
             useLegacyPackaging = true
         }
@@ -66,12 +81,15 @@ android {
 
 dependencies {
     implementation fileTree(dir: "libs", include: '*.jar')
-    
-    implementation 'androidx.core:core-ktx:1.9.0'
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.8.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+    implementation libs.androidx.core.ktx
+    implementation libs.androidx.appcompat
+    implementation libs.material
+    implementation libs.androidx.activity.ktx
+    implementation libs.androidx.fragment.ktx
+    implementation libs.androidx.constraintlayout
+
+    testImplementation libs.junit
+    androidTestImplementation libs.androidx.junit
+    androidTestImplementation libs.androidx.espresso.core
 }

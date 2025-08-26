@@ -1,0 +1,5 @@
+# ninja log v5
+0	595	1756106999147880669	CMakeFiles/native-lib.dir/native-lib.cpp.o	aa876fc7067dc58b
+596	711	1756106999266704844	/Users/shou/phoenix/template_app/native/android/app/build/intermediates/cxx/Debug/21k235gl/obj/arm64-v8a/libnative-lib.so	cb35f8ea1d3eb12a
+1	515	1756107518407259452	CMakeFiles/native-lib.dir/native-lib.cpp.o	aa876fc7067dc58b
+515	631	1756107518524464924	/Users/shou/phoenix/template_app/native/android/app/build/intermediates/cxx/Debug/21k235gl/obj/arm64-v8a/libnative-lib.so	cb35f8ea1d3eb12a

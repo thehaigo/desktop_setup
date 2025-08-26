@@ -13,7 +13,6 @@ defmodule Mix.Tasks.Desktop.Install do
     update_config_exs_if_needed(host_project_config)
     update_endpoint_ex_if_needed(host_project_config)
     update_application_ex_if_needed(host_project_config, database)
-    update_mix_exs_project_if_needed(host_project_config)
     update_mix_exs_application_if_needed(host_project_config)
     update_mix_exs_deps_if_needed(host_project_config, database)
     update_repo_ex_if_needed(host_project_config, database)
@@ -76,36 +75,6 @@ defmodule Mix.Tasks.Desktop.Install do
       updated_config_body =
         config_body
         |> String.replace(~r/@session_options \[[\s\S]*?\]/, full_replace_string)
-
-      IO.binwrite(app_config, updated_config_body)
-      File.close(app_config)
-    end
-  end
-
-  defp update_mix_exs_project_if_needed(%{mix_config_path: path, app_name: app_name}) do
-    replace_string =
-      "releases: [\n#{app_name}: [\ninclude_erts: \"\#{File.cwd!()}/deps/desktop_setup/priv/erlang/erts-14.2.5\"\n]\n]"
-
-    {:ok, config_body} = File.read(path)
-
-    if String.contains?(config_body, "include_erts") do
-      IO.puts("mix.exs project already modified, skipping...")
-    else
-      Owl.IO.puts([Owl.Data.tag("* updating ", :yellow), "mix.exs"])
-
-      {:ok, app_config} = File.open(path, [:write])
-
-      updated_config_body =
-        if String.contains?(config_body, "listeners: [Phoenix.CodeReloader]") do
-          config_body
-          |> String.replace(
-            ~r/listeners: \[Phoenix.CodeReloader\]/,
-            "listeners: [Phoenix.CodeReloader],\n#{replace_string}"
-          )
-        else
-          config_body
-          |> String.replace(~r/deps: deps()/, "deps: deps(),\n#{replace_string}")
-        end
 
       IO.binwrite(app_config, updated_config_body)
       File.close(app_config)
