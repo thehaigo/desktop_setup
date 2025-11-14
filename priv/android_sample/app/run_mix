@@ -9,8 +9,8 @@ export MIX_TARGET=android
 cd ../../../
 
 
-asdf set -u erlang 26.2.5
-asdf set -u elixir 1.17.2-otp-26
+asdf set -u erlang 27.3.4
+asdf set -u elixir 1.18.4-otp-27
 
 
 export PATH="$HOME/.asdf/shims:$HOME/.asdf/bin:$PATH"
