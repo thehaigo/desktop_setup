@@ -1,28 +1,23 @@
-# For more information about using CMake with Android Studio, read the
-# documentation: https://d.android.com/studio/projects/add-native-code.html.
-# For more examples on how to use CMake, see https://github.com/android/ndk-samples.
-
-# Sets the minimum CMake version required for this project.
 cmake_minimum_required(VERSION 3.22.1)
+project(bookstore_native LANGUAGES C CXX)
 
-# Declares the project name. The project name can be accessed via ${ PROJECT_NAME},
-# Since this is the top level CMakeLists.txt, the project name is also accessible
-# with ${CMAKE_PROJECT_NAME} (both CMake variables are in-sync within the top level
-# build script scope).
-project("template_app")
+
+set(CMAKE_ANDROID_STL_TYPE c++_shared)
+
 
 add_library(native-lib SHARED native-lib.cpp)
 
-# Searches for a specified prebuilt library and stores the path as a
-# variable. Because CMake includes system libraries in the search path by
-# default, you only need to specify the name of the public NDK library
-# you want to add. CMake verifies that the library exists before
-# completing its build.
+
+set_target_properties(native-lib PROPERTIES OUTPUT_NAME native-lib)
+
 
 find_library(log-lib log)
+find_library(dl-lib dl)
 
-# Specifies libraries CMake should link to your target library. You
-# can link multiple libraries, such as libraries you define in this
-# build script, prebuilt third-party libraries, or system libraries.
 
-target_link_libraries(native-lib ${log-lib})
+target_link_libraries(
+        native-lib
+        c++_shared
+        ${log-lib}
+        ${dl-lib}
+)

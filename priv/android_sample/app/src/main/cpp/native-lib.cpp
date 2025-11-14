@@ -157,7 +157,7 @@ const char* startErlang(std::string root_dir, std::string log_dir)
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_templateapp_Bridge_startErlang(
+Java_com_example_template_app_Bridge_startErlang(
         JNIEnv* env,
         jobject /* this */, jstring release_dir, jstring log_dir) {
 
