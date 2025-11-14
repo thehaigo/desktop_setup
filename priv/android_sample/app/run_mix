@@ -10,7 +10,7 @@ cd ../../../
 
 
 asdf set -u erlang 27.3.4
-asdf set -u elixir 1.18.4-otp-27
+asdf set -u elixir 1.19.3-otp-27
 
 
 export PATH="$HOME/.asdf/shims:$HOME/.asdf/bin:$PATH"
