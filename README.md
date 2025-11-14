@@ -6,12 +6,12 @@ https://github.com/elixir-desktop/desktop
 
 
 ## Requirements
-Using Erlang version 26.2.5
+Using Erlang version 27.3.4
 Therefore, the build environment must be the same
 
 ```
-asdf install erlang 26.2.5
-asdf install elixir 1.17.2-otp-26
+asdf install erlang 27.3.4
+asdf install elixir 1.18.4-otp-27
 brew install carthage xcodegen
 ```
 
@@ -71,6 +71,7 @@ try `./app/run_mix` at console
 - [x] iOS App setup
 - [x] Android App setup
 - [x] update Android Erlang 25 -> 26
+- [x] update Android Erlang 26 -> 27
 
 
 ## Use PostgreSQL at iOS and Android app in Develop
