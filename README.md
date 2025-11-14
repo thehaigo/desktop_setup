@@ -11,7 +11,7 @@ Therefore, the build environment must be the same
 
 ```
 asdf install erlang 27.3.4
-asdf install elixir 1.18.4-otp-27
+asdf install elixir 1.19.3-otp-27
 brew install carthage xcodegen
 ```
 
