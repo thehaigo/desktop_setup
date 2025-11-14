@@ -243,6 +243,19 @@ class Bridge(private val applicationContext : Context, private var webview : Web
     @SuppressLint("SetJavaScriptEnabled")
     fun setWebView(_webview: WebView) {
         webview = _webview
+
+        val settings = webview.settings
+        settings.setSupportMultipleWindows(true)
+        settings.javaScriptEnabled = true
+        settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
+        settings.useWideViewPort = true
+        // enable Web Storage: localStorage, sessionStorage
+        settings.domStorageEnabled = true
+        // webview.webViewClient = WebViewClient()
+        if (lastURL.isNotBlank()) {
+            webview.post { webview.loadUrl(lastURL) }
+        }
+
         webview.webChromeClient = object : WebChromeClient() {
             override fun onCreateWindow(
                 view: WebView?,
@@ -268,19 +281,34 @@ class Bridge(private val applicationContext : Context, private var webview : Web
                 }
                 return true
             }
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                this@Bridge.filePathCallback?.onReceiveValue(null)
+                this@Bridge.filePathCallback = filePathCallback
+
+                return try {
+                    val intent = fileChooserParams?.createIntent()
+                        ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                            putExtra(
+                                Intent.EXTRA_ALLOW_MULTIPLE,
+                                fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE
+                            )
+                        }
+                    launchPicker(intent)
+                    true
+                } catch (e: ActivityNotFoundException) {
+                    this@Bridge.filePathCallback?.onReceiveValue(null)
+                    this@Bridge.filePathCallback = null
+                    false
+                }
+            }
         }
 
-        val settings = webview.settings
-        settings.setSupportMultipleWindows(true)
-        settings.javaScriptEnabled = true
-        settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
-        settings.useWideViewPort = true
-        // enable Web Storage: localStorage, sessionStorage
-        settings.domStorageEnabled = true
-        // webview.webViewClient = WebViewClient()
-        if (lastURL.isNotBlank()) {
-            webview.post { webview.loadUrl(lastURL) }
-        }
     }
 
 
