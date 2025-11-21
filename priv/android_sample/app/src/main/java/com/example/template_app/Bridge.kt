@@ -1,7 +1,7 @@
 package com.example.template_app
 
 import android.annotation.SuppressLint
-import android.app.PendingIntent
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -10,13 +10,11 @@ import android.os.Build
 import android.os.Message
 import android.system.Os
 import android.util.Log
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import org.json.JSONArray
 import org.json.JSONObject
@@ -27,9 +25,17 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import java.util.zip.ZipInputStream
+import androidx.core.net.toUri
 
 
-class Bridge(private val applicationContext : Context, private var webview : WebView) {
+class Bridge(
+    private val activity: Activity,
+    private var webview : WebView,
+    private val launchPicker: (Intent) -> Unit
+) {
+    private val applicationContext = activity.applicationContext
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+
     private val server = ServerSocket(0)
     private var lastURL = String()
     private val assets = applicationContext.assets.list("")
@@ -117,11 +123,9 @@ class Bridge(private val applicationContext : Context, private var webview : Web
             }
 
             // Cleaning deprecated build-xxx folders
-            for (file in applicationContext.filesDir.list()!!) {
-                if (file.startsWith("build-")) {
-                    File(applicationContext.filesDir.absolutePath + "/" + file).deleteRecursively()
-                }
-            }
+            applicationContext.filesDir.list()
+                ?.filter { it.startsWith("build-") }
+                ?.forEach { File(applicationContext.filesDir, it).deleteRecursively() }
 
             val binDir = "$releaseDir/bin"
 
@@ -131,15 +135,14 @@ class Bridge(private val applicationContext : Context, private var webview : Web
 
             if (!doneFile.exists()) {
                 File(binDir).mkdirs()
-                if (unpackAsset(releaseDir, "app") &&
-                        unpackAsset(releaseDir, runtime)) {
-                    for (lib in File("$releaseDir/lib").list()!!) {
-                        val parts = lib.split("-")
-                        val name = parts[0]
-
-                        val nif = "$prefix-nif-$name"
-                        unpackAsset("$releaseDir/lib/$lib/priv", nif)
-                    }
+                if (unpackAsset(releaseDir, "app") && unpackAsset(releaseDir, runtime)) {
+                    File("$releaseDir/lib").list()
+                        ?.forEach { lib ->
+                            val parts = lib.split("-")
+                            val name = parts[0]
+                            val nif = "$prefix-nif-$name"
+                            unpackAsset("$releaseDir/lib/$lib/priv", nif)
+                        }
 
                     doneFile.writeText(lastUpdateTime)
                 }
@@ -154,14 +157,16 @@ class Bridge(private val applicationContext : Context, private var webview : Web
             // Re-creating even on relaunch because we can't
             // be sure of the native libs directory
             // https://github.com/JeromeDeBretagne/erlanglauncher/issues/2
-            for (file in File(nativeDir).list()!!) {
-                if (file.startsWith("lib__")) {
-                    var name = File(file).name
-                    name = name.substring(5, name.length - 3)
-                    Log.d("BIN", "$nativeDir/$file -> $binDir/$name")
-                    File("$binDir/$name").delete()
-                    Os.symlink("$nativeDir/$file", "$binDir/$name")
-                }
+            if (nativeDir != null) {
+                File(nativeDir).list()
+                    ?.filter { it.startsWith("lib__") }
+                    ?.forEach { file ->
+                        var name = File(file).name
+                        name = name.substring(5, name.length - 3)
+                        Log.d("BIN", "$nativeDir/$file -> $binDir/$name")
+                        File("$binDir/$name").delete()
+                        Os.symlink("$nativeDir/$file", "$binDir/$name")
+                    }
             }
 
             var logdir = applicationContext.getExternalFilesDir("")?.path
@@ -247,40 +252,17 @@ class Bridge(private val applicationContext : Context, private var webview : Web
         val settings = webview.settings
         settings.setSupportMultipleWindows(true)
         settings.javaScriptEnabled = true
+        settings.domStorageEnabled = true
+        settings.allowFileAccess = true
+        settings.allowContentAccess = true
         settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
         settings.useWideViewPort = true
-        // enable Web Storage: localStorage, sessionStorage
-        settings.domStorageEnabled = true
-        // webview.webViewClient = WebViewClient()
+
         if (lastURL.isNotBlank()) {
             webview.post { webview.loadUrl(lastURL) }
         }
 
         webview.webChromeClient = object : WebChromeClient() {
-            override fun onCreateWindow(
-                view: WebView?,
-                isDialog: Boolean,
-                isUserGesture: Boolean,
-                resultMsg: Message?
-            ): Boolean {
-                val newWebView = WebView(applicationContext)
-                view?.addView(newWebView)
-                val transport = resultMsg?.obj as WebView.WebViewTransport
-
-                transport.webView = newWebView
-                resultMsg.sendToTarget()
-
-                newWebView.webViewClient = object : WebViewClient() {
-                    @Deprecated("Deprecated in Java")
-                    override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        applicationContext.startActivity(intent)
-                        return true
-                    }
-                }
-                return true
-            }
             override fun onShowFileChooser(
                 webView: WebView?,
                 filePathCallback: ValueCallback<Array<Uri>>?,
@@ -307,8 +289,31 @@ class Bridge(private val applicationContext : Context, private var webview : Web
                     false
                 }
             }
-        }
+            override fun onCreateWindow(
+                view: WebView?,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message?
+            ): Boolean {
+                val newWebView = WebView(applicationContext)
+                view?.addView(newWebView)
+                val transport = resultMsg?.obj as WebView.WebViewTransport
 
+                transport.webView = newWebView
+                resultMsg.sendToTarget()
+
+                newWebView.webViewClient = object : WebViewClient() {
+                    @Deprecated("Deprecated in Java")
+                    override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+                        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        applicationContext.startActivity(intent)
+                        return true
+                    }
+                }
+                return true
+            }
+        }
     }
 
 
@@ -337,7 +342,7 @@ class Bridge(private val applicationContext : Context, private var webview : Web
 
             }
             if (method == ":launchDefaultBrowser") {
-                val uri = Uri.parse(args.getString(0))
+                val uri = args.getString(0).toUri()
                 if (uri.scheme == "http") {
                     val browserIntent = Intent(Intent.ACTION_VIEW, uri)
                     applicationContext.startActivity(browserIntent)
@@ -385,6 +390,18 @@ class Bridge(private val applicationContext : Context, private var webview : Web
             writerLock.unlock()
         }
     }
+
+    fun onFilePickerResult(resultCode: Int, data: Intent?) {
+        val uris = WebChromeClient.FileChooserParams.parseResult(resultCode, data)
+        filePathCallback?.onReceiveValue(uris)
+        filePathCallback = null
+    }
+
+    fun dispose() {
+        filePathCallback?.onReceiveValue(null)
+        filePathCallback = null
+    }
+
 
     private fun getCurrentLocale(context: Context): Locale {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {

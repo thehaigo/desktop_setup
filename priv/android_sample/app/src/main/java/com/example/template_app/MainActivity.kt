@@ -1,62 +1,64 @@
 package com.example.template_app
 
-import android.app.Activity
 import android.os.Bundle
-import android.system.Os
 import android.view.KeyEvent
 import android.view.View
-import com.example.template_app.databinding.ActivityMainBinding
-import java.io.*
-import java.util.*
 import android.webkit.WebView
-
 import android.webkit.WebViewClient
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 
 
-class MainActivity : Activity() {
-    private lateinit var binding: ActivityMainBinding
+class MainActivity : AppCompatActivity() {
+    private lateinit var webView: WebView
+    private lateinit var splash: View
+    private lateinit var bridge: Bridge
+
+    private val filePicker = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        bridge.onFilePickerResult(result.resultCode, result.data)
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        binding.browser.webViewClient = object : WebViewClient() {
+        setContentView(R.layout.activity_main)
+        webView = findViewById(R.id.browser)
+        splash = findViewById(R.id.splash)
+
+        if (::bridge.isInitialized) {
+            bridge.setWebView(webView)
+        } else {
+            // ★ Activity と ランチャを渡す
+            bridge = Bridge(
+                activity = this,
+                webview = webView,
+                launchPicker = { intent -> filePicker.launch(intent) }
+            )
+        }
+
+        webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
-                if (binding.browser.visibility != View.VISIBLE) {
-                    binding.browser.visibility = View.VISIBLE
-                    binding.splash.visibility = View.GONE
+                if (webView.visibility != View.VISIBLE) {
+                    webView.visibility = View.VISIBLE
+                    splash.visibility = View.GONE
                     reportFullyDrawn()
                 }
             }
         }
-
-        if (bridge != null) {
-            // This happens on re-creation of the activity e.g. after rotating the screen
-            bridge!!.setWebView(binding.browser)
-        } else {
-            // This happens only on the first time when starting the app
-            bridge = Bridge(applicationContext, binding.browser)
-        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            when (keyCode) {
-                KeyEvent.KEYCODE_BACK -> {
-                    if (binding.browser.canGoBack()) {
-                        binding.browser.goBack()
-                    } else {
-                        finish()
-                    }
-                    return true
-                }
+        if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_BACK) {
+            if (webView.canGoBack()) {
+                webView.goBack()
+            } else {
+                finish()
             }
+            return true
         }
         return super.onKeyDown(keyCode, event)
-    }
-
-    companion object {
-        var bridge: Bridge? = null
     }
 }
