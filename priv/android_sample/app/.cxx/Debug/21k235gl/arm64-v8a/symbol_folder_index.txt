@@ -1,1 +1,0 @@
-/Users/shou/phoenix/template_app/native/android/app/build/intermediates/cxx/Debug/21k235gl/obj/arm64-v8a

@@ -1,3 +1,0 @@
-/Users/shou/phoenix/template_app/native/app/.cxx/Debug/21k235gl/x86/CMakeFiles/template_app.dir
-/Users/shou/phoenix/template_app/native/app/.cxx/Debug/21k235gl/x86/CMakeFiles/edit_cache.dir
-/Users/shou/phoenix/template_app/native/app/.cxx/Debug/21k235gl/x86/CMakeFiles/rebuild_cache.dir
