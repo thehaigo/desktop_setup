@@ -260,7 +260,10 @@ defmodule Mix.Tasks.Desktop.Install do
     end
   end
 
-  defp update_repo_ex_if_needed(%{repo_path: path}, :sqlite) do
+  defp update_repo_ex_if_needed(
+         %{repo_path: path, app_namespace: app_namespace, app_name: app_name},
+         :sqlite
+       ) do
     replace_string = "migration"
     {:ok, repo_body} = File.read(path)
 
@@ -275,7 +278,25 @@ defmodule Mix.Tasks.Desktop.Install do
         repo_body
         |> String.replace(
           ~r/adapter: Ecto.Adapters.SQLite3/,
-          "adapter: Ecto.Adapters.SQLite3 \n\n def migration() do\nend"
+          """
+          adapter: Ecto.Adapters.SQLite3
+
+          def migration do
+            migrations()
+            |> Enum.sort_by(&elem(&1, 0))
+            |> Enum.each(fn {version, mod} ->
+              Ecto.Migrator.up(__MODULE__, version, mod)
+            end)
+          end
+
+          defp migrations do
+            {:ok, modules} = :application.get_key(:#{app_name}, :modules)
+            Enum.filter(modules, fn mod ->
+              Atom.to_string(mod) |> String.contains?("#{app_namespace}.Migrations.")
+            end)
+            |> Enum.map(&{&1.version(), &1})
+          end
+          """
         )
 
       IO.binwrite(repo_config, updated_config_body)
