@@ -39,8 +39,8 @@ mix deps.get
 
 # (cd assets && npm ci && npm run build)
 
-mix assets.deploy
 mix release --overwrite
+mix assets.deploy
 
 REL_DIR="_build/${MIX_TARGET}_${MIX_ENV}/rel/template_app"
 [ -d "$REL_DIR" ] || { echo "Release dir not found: $REL_DIR"; exit 1; }

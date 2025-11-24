@@ -44,8 +44,9 @@ if [ -f "$BASE/TemplateApp/app.zip" ]; then
   rm "$BASE/TemplateApp/app.zip"
 fi
 
-mix assets.deploy && \
+
   mix release --overwrite && \
+  mix assets.deploy && \
   cd _build/ios_prod/rel/template_app && \
   zip -9r "$BASE/TemplateApp/app.zip" lib/ releases/ --exclude "*.so"  
 
