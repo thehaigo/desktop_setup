@@ -10,6 +10,8 @@ Using Erlang version 27.3.4
 Therefore, the build environment must be the same
 
 ```
+brew install wxwidgets@3.2 openssl@3
+export KERL_CONFIGURE_OPTIONS="--without-javac --with-ssl=$(brew --prefix openssl@3) --with-wx-config=$(brew --prefix wxwidgets@3.2)/bin/wx-config-3.2"
 asdf install erlang 27.3.4
 asdf install elixir 1.19.3-otp-27
 brew install carthage xcodegen
