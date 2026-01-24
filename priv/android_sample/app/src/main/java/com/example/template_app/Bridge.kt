@@ -467,9 +467,9 @@ class Bridge(
     private external fun startErlang(releaseDir: String, logdir: String): String
 
     companion object {
-        // Used to load the 'native-lib' library on application startup.
+        // Used to load the 'app' library on application startup.
         init {
-            System.loadLibrary("native-lib")
+            System.loadLibrary("app")
         }
     }
 }
