@@ -28,8 +28,8 @@ mix local.rebar --force --if-missing
 cd ../../
 
 
-asdf set erlang 27.3.4
-asdf set elixir 1.19.3-otp-27
+asdf set erlang 28.3.1
+asdf set elixir 1.19.5-otp-28
 
 
 if [ ! -d "deps/desktop" ]; then
