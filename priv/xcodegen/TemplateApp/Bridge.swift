@@ -129,7 +129,6 @@ class Bridge {
         print("Server re-init called")
         let conn = connectionsByID.first
         if conn == nil || conn?.value.connection.state == .cancelled {
-            conn?.value.connection.state == .cancelled {
             stopListener()
             setupListener()
         }

@@ -6,14 +6,14 @@ https://github.com/elixir-desktop/desktop
 
 
 ## Requirements
-Using Erlang version 27.3.4
+Using Erlang version 28.3.1
 Therefore, the build environment must be the same
 
 ```
 brew install wxwidgets@3.2 openssl@3
 export KERL_CONFIGURE_OPTIONS="--without-javac --with-ssl=$(brew --prefix openssl@3) --with-wx-config=$(brew --prefix wxwidgets@3.2)/bin/wx-config-3.2"
-asdf install erlang 27.3.4
-asdf install elixir 1.19.3-otp-27
+asdf install erlang 28.3.1
+asdf install elixir 1.19.5-otp-28
 brew install carthage xcodegen
 ```
 
@@ -74,6 +74,7 @@ try `./app/run_mix` at console
 - [x] Android App setup
 - [x] update Android Erlang 25 -> 26
 - [x] update Android Erlang 26 -> 27
+- [x] update Android Erlang 27 -> 28
 
 
 ## Use PostgreSQL at iOS and Android app in Develop
