@@ -20,9 +20,12 @@ struct TemplateApp: App {
                 print(".background")
             case .active:
                 print(".active")
-                if let bridge = Bridge.instance {
-                    bridge.reinit()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    if let bridge = Bridge.instance {
+                        bridge.reinit()
+                    }
                 }
+
             default: break
             }
         }

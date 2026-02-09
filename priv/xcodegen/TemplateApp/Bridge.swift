@@ -17,7 +17,15 @@ class Bridge {
     var lastURL: URL?
     static public var instance: Bridge?
     var erlangStarted = false
-    
+        enum ListenerState {
+        case idle
+        case starting
+        case ready
+        case failed
+        case cancelled
+    }
+    var listenerState: ListenerState = .idle
+
     func setWebView(view :WebViewController) {
         self.webview = view
         loadURL()
@@ -81,17 +89,46 @@ class Bridge {
     }
     
     func setupListener() {
-        let l = try! NWListener(using: .tcp, on: Bridge.port())
-        l.stateUpdateHandler = self.stateDidChange(to:)
-        l.newConnectionHandler = self.didAccept(nwConnection:)
-        l.start(queue: .global())
-        listener = l
+        if listener != nil || listenerState == .starting || listenerState == .ready {
+            print("setupListener: listener already exists or starting (state: \(listenerState)), skipping")
+            return
+        }
+
+        do {
+            let l = try NWListener(using: .tcp, on: Bridge.port())
+            l.stateUpdateHandler = self.stateDidChange(to:)
+            l.newConnectionHandler = self.didAccept(nwConnection:)
+            l.start(queue: .global())
+            listener = l
+        } catch {
+            print("setupListener: failed to create listener: \(error)")
+            listenerState = .failed
+        }
+
     }
     
+    func forceReconnect() {
+        print("Server force reconnect called")
+        for connection in self.connectionsByID.values {
+            connection.didStopCallback = nil
+            connection.stop()
+        }
+        self.connectionsByID.removeAll()
+
+        stopListener()
+        listenerState = .idle
+
+        setupListener()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.loadURL()
+        }
+    }
+
     func reinit() {
         print("Server re-init called")
         let conn = connectionsByID.first
-        if conn == nil ||
+        if conn == nil || conn?.value.connection.state == .cancelled {
             conn?.value.connection.state == .cancelled {
             stopListener()
             setupListener()
@@ -128,6 +165,7 @@ class Bridge {
     func stateDidChange(to newState: NWListener.State) {
         switch newState {
         case .ready:
+            listenerState = .ready
             if erlangStarted {
                 break
             }
@@ -148,11 +186,14 @@ class Bridge {
             print("Ret: " + String(cString: ret!))
 
         case .failed(let error):
+            listenerState = .failed
             print("Server failure, error: \(error.localizedDescription)")
-            exit(EXIT_FAILURE)
+            if !erlangStarted {
+                exit(EXIT_FAILURE)
+            }
         case .cancelled:
-            print("Server failure, cancelled")
-            exit(EXIT_FAILURE)
+            listenerState = .cancelled
+            print("Server listener cancelled (for reconnect)")
         default:
             print("Server unknown new state: \(newState)")
             break
@@ -178,6 +219,16 @@ class Bridge {
     private func connectionDidStop(_ connection: ServerConnection) {
         self.connectionsByID.removeValue(forKey: connection.id)
         print("server did close connection \(connection.id)")
+        // 全ての接続が切れた場合、リスナーを再作成してElixirが再接続できるようにする
+        if self.connectionsByID.isEmpty && erlangStarted {
+            print("All connections closed, restarting listener for reconnection")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self = self else { return }
+                self.stopListener()
+                self.listenerState = .idle
+                self.setupListener()
+            }
+        }
     }
     
     private func stopListener() {
@@ -185,6 +236,7 @@ class Bridge {
             l.stateUpdateHandler = nil
             l.newConnectionHandler = nil
             l.cancel()
+            listener = nil
         }
     }
 
