@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(bookstore_native LANGUAGES C CXX)
+project(template_app_native LANGUAGES C CXX)
 
 
 set(CMAKE_ANDROID_STL_TYPE c++_shared)

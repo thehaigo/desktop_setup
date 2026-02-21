@@ -9,10 +9,9 @@ android {
     namespace 'com.example.template_app'
     compileSdk 36
 
-    tasks.register("buildNum", Exec) {
+    tasks.register("buildElixirRelease", Exec) {
         workingDir project.projectDir
 
-        // bash 経由で実行（相対パスの事故回避）
         commandLine "/bin/bash", "$projectDir/run_mix"
         def home = System.getProperty("user.home")
         environment "PATH", [
@@ -28,7 +27,7 @@ android {
 
     plugins.withId("com.android.application") {
         tasks.named("preBuild").configure {
-            dependsOn(tasks.named("buildNum"))
+            dependsOn(tasks.named("buildElixirRelease"))
         }
     }
 

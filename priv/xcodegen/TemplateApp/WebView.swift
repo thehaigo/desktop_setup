@@ -99,17 +99,16 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         switch message.name {
         case "openSafari":
-            print(message.body)
-            let url = URL(string:message.body as! String)
-            if( UIApplication.shared.canOpenURL(url!) ) {
-              UIApplication.shared.open(url!)
+            if let urlString = message.body as? String, let url = URL(string: urlString) {
+                if UIApplication.shared.canOpenURL(url) {
+                    UIApplication.shared.open(url)
+                }
             }
         case "error":
-            // You should actually handle the error :)
             let error = (message.body as? [String: Any])?["message"] as? String ?? "unknown"
-            assertionFailure("JavaScript error: \(error)")
+            print("WebView JS error: \(error)")
         default:
-            assertionFailure("Received invalid message: \(message.name)")
+            print("WebView: received unknown message: \(message.name)")
         }
     }
 }

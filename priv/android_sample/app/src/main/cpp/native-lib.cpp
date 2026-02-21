@@ -52,7 +52,7 @@ const char* startErlang(std::string root_dir, std::string log_dir)
     if (!erts_version) ERROR("Could not identify erts version in start_erl.data file");
 
     char* app_version = strtok(0, " ");
-    if (!app_version) ERROR("Could not idenfity app version in start_erl.data file");
+    if (!app_version) ERROR("Could not identify app version in start_erl.data file");
 
 
     std::string bin_dir = getenv("BINDIR");

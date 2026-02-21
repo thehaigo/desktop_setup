@@ -17,12 +17,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.content.FileProvider
 import org.json.JSONArray
-import org.json.JSONObject
 import java.net.ServerSocket
 import kotlin.concurrent.thread
 import java.io.*
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import java.util.zip.ZipInputStream
 import androidx.core.net.toUri
@@ -39,18 +37,8 @@ class Bridge(
     private val server = ServerSocket(0)
     private var lastURL = String()
     private val assets = applicationContext.assets.list("")
-    private var writers = ArrayList<DataOutputStream>()
     private val writerLock = ReentrantLock()
 
-    class Notification {
-        var title = String()
-        var message = String()
-        var callback = 0uL
-        var pid = JSONObject()
-        var obj = JSONArray()
-    }
-
-    private val notifications = ConcurrentHashMap<ULong, Notification>()
 
     init {
         Os.setenv("ELIXIR_DESKTOP_OS", "android", false)
@@ -64,22 +52,16 @@ class Bridge(
             while (true) {
                 val socket = server.accept()
                 socket.tcpNoDelay = true
-                println("Client connected: ${socket.inetAddress.hostAddress}")
+                Log.d("Bridge", "Client connected: ${socket.inetAddress.hostAddress}")
                 thread {
                     val reader = DataInputStream(BufferedInputStream((socket.getInputStream())))
                     val writer = DataOutputStream(socket.getOutputStream())
-                    writerLock.lock()
-                    writers.add(writer)
-                    writerLock.unlock()
                     try {
                         handle(reader, writer)
                     } catch(e : EOFException) {
-                        println("Client disconnected: ${socket.inetAddress.hostAddress}")
+                        Log.d("Bridge", "Client disconnected: ${socket.inetAddress.hostAddress}")
                         socket.close()
                     }
-                    writerLock.lock()
-                    writers.remove(writer)
-                    writerLock.unlock()
                 }
             }
         }
@@ -105,7 +87,6 @@ class Bridge(
         }
 
         val runtime = "$prefix-runtime"
-        Log.d("RUNTIME", runtime)
 
         thread(start = true) {
             val packageInfo = applicationContext.packageManager
@@ -163,7 +144,6 @@ class Bridge(
                     ?.forEach { file ->
                         var name = File(file).name
                         name = name.substring(5, name.length - 3)
-                        Log.d("BIN", "$nativeDir/$file -> $binDir/$name")
                         File("$binDir/$name").delete()
                         Os.symlink("$nativeDir/$file", "$binDir/$name")
                     }
@@ -186,10 +166,6 @@ class Bridge(
 
     private fun unpackAsset(releaseDir: String, assetName: String): Boolean {
         assets!!
-        //if (assets.contains("$assetName.zip.xz")) {
-        //    val input = BufferedInputStream(applicationContext.assets.open("$assetName.zip.xz"))
-        //    return unpackZip(releaseDir, XZInputStream(input))
-        //}
         if (assets.contains("$assetName.zip")) {
             val input = BufferedInputStream(applicationContext.assets.open("$assetName.zip"))
             return unpackZip(releaseDir, input)
@@ -198,7 +174,6 @@ class Bridge(
     }
 
     private fun unpackZip(releaseDir: String, inputStream: InputStream): Boolean {
-        Log.d("RELEASEDIR", releaseDir)
         File(releaseDir).mkdirs()
         try
         {
@@ -214,14 +189,12 @@ class Bridge(
                 // it will generate an Exception...
                 val fullpath = "$releaseDir/$filename"
                 if (ze.isDirectory) {
-                    Log.d("DIR", fullpath)
                     File(fullpath).mkdirs()
                     zis.closeEntry()
                     ze =  zis.nextEntry
                     continue
                 }
 
-                Log.d("FILE", fullpath)
                 val fout = FileOutputStream(fullpath)
                 var count = zis.read(buffer)
                 while (count != -1) {
@@ -382,8 +355,6 @@ class Bridge(
             reader.readFully(data)
 
             val json = JSONArray(String(data))
-
-            val module = json.getString(0)
             val method = json.getString(1)
             val args = json.getJSONArray(2)
 
@@ -424,22 +395,6 @@ class Bridge(
             writer.writeInt(response.size)
             writer.write(response)
             writerLock.unlock()        }
-    }
-
-    fun sendMessage(message : ByteArray) {
-        thread {
-            writerLock.lock()
-            while (writers.isEmpty()) {
-                writerLock.unlock()
-                Thread.sleep(100)
-                writerLock.lock()
-            }
-            for (writer in writers) {
-                writer.writeInt(message.size)
-                writer.write(message)
-            }
-            writerLock.unlock()
-        }
     }
 
     fun onFilePickerResult(resultCode: Int, data: Intent?) {
@@ -492,23 +447,6 @@ class Bridge(
     private fun stringToList(str : String): String {
         val numbers = str.toByteArray().map { it.toInt().toString() }
         return "[${numbers.joinToString(",")}]"
-    }
-
-    private fun listToString(raw : JSONArray): String {
-        var title = ""
-        for (i in 0 until raw.length()) {
-            title += raw.getInt(i).toChar()
-        }
-        return title
-    }
-
-    private fun getKeyword(keywords: JSONArray, searchKey : String) : Any {
-        for (i in 0 until keywords.length()) {
-            val tupleValues = keywords.getJSONObject(i).getJSONArray(":value")
-            val key = tupleValues.getString(0)
-            if (key == searchKey) return tupleValues.get(1)
-        }
-        return ""
     }
 
     /**

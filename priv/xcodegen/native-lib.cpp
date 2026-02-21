@@ -129,7 +129,7 @@ const char* start_erlang(const char* root, const char* home) {
     if (!erts_version) ERROR("Could not identify erts version in start_erl.data file");
 
     char* app_version = strtok(0, " ");
-    if (!app_version) ERROR("Could not idenfity app version in start_erl.data file");
+    if (!app_version) ERROR("Could not identify app version in start_erl.data file");
         
     std::thread erlang([=]{
         return startErlang(root_dir, log_dir, app_version, erts_version);
