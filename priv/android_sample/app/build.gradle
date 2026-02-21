@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
 }
 
 def erlangLibsDir = new File(project.rootDir, "erlang-libs")
