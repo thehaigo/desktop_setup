@@ -78,6 +78,16 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     func onFinish(finish: @escaping () -> ()) {
         self.finish = finish
     }
+
+    func evaluateJavaScript(_ script: String) {
+        DispatchQueue.main.async { [weak self] in
+            self?.webview.evaluateJavaScript(script) { _, error in
+                if let error = error {
+                    print("JS evaluation error: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
     
     func webView(_ webView: WKWebView,
                           didFinish navigation: WKNavigation!) {

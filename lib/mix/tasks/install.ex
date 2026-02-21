@@ -17,6 +17,7 @@ defmodule Mix.Tasks.Desktop.Install do
     update_mix_exs_deps_if_needed(host_project_config, database)
     update_repo_ex_if_needed(host_project_config, database)
     update_prod_ex_if_needed(host_project_config, database)
+    update_app_js_if_needed(host_project_config)
     rename_runtime_exs_if_needed(host_project_config)
     clean_build_path(host_project_config)
     format_config_files()
@@ -352,6 +353,35 @@ defmodule Mix.Tasks.Desktop.Install do
 
   defp update_prod_ex_if_needed(_, _) do
     IO.puts("prod.exs no use postgrex, skipping...")
+  end
+
+  defp update_app_js_if_needed(%{app_js_path: path}) do
+    if !File.exists?(path) do
+      IO.puts("app.js not found, skipping...")
+    else
+      {:ok, body} = File.read(path)
+
+      cond do
+        String.contains?(body, "window.liveSocket = liveSocket") ->
+          IO.puts("app.js already modified, skipping...")
+
+        String.contains?(body, "let liveSocket") or String.contains?(body, "const liveSocket") ->
+          Owl.IO.puts([Owl.Data.tag("* updating ", :yellow), "assets/js/app.js"])
+
+          updated_body =
+            body
+            # Expose liveSocket to window for native Bridge reconnect control
+            |> String.replace(
+              "liveSocket.connect()",
+              "liveSocket.connect()\nwindow.liveSocket = liveSocket"
+            )
+
+          File.write!(path, updated_body)
+
+        true ->
+          IO.puts("app.js: liveSocket declaration not found, skipping...")
+      end
+    end
   end
 
   def rename_runtime_exs_if_needed(%{runtime_path: path}) do

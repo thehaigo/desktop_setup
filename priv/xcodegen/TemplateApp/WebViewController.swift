@@ -34,4 +34,8 @@ struct WebViewController: UIViewRepresentable {
     func loadURL(url: URL) {
         webview.webview.load(URLRequest(url: url))
     }
+
+    func evaluateJavaScript(_ script: String) {
+        webview.evaluateJavaScript(script)
+    }
 }

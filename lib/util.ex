@@ -20,7 +20,8 @@ defmodule Util do
       current_path: current_path,
       native_path: Path.join(current_path, "native"),
       libs_path: Path.join(build_path, "dev/lib"),
-      mix_config_path: mix_config_path
+      mix_config_path: mix_config_path,
+      app_js_path: Path.join(current_path, "assets/js/app.js")
     }
   end
 

@@ -17,6 +17,7 @@ class Bridge {
     var lastURL: URL?
     static public var instance: Bridge?
     var erlangStarted = false
+    private var isReinitializing = false
     
     func setWebView(view :WebViewController) {
         self.webview = view
@@ -88,14 +89,77 @@ class Bridge {
         listener = l
     }
     
+    /// Disconnect LiveView WebSocket before going to background.
+    /// This prevents the LiveView JS from attempting reconnections
+    /// while iOS has suspended the app's network connections.
+    func suspendWebSocket() {
+        print("Bridge: suspending LiveView WebSocket")
+        webview?.evaluateJavaScript("""
+            if (window.__bridgeSuspended) return;
+            window.__bridgeSuspended = true;
+            if (window.liveSocket) {
+                window.liveSocket.disconnect();
+            }
+        """)
+    }
+
+    /// Re-initialize the Bridge TCP listener after returning to foreground.
+    /// After the TCP connection is re-established and the Elixir-side ranch
+    /// listener has been resumed, triggers a LiveView reconnect via JS injection.
     func reinit() {
         print("Server re-init called")
+        guard !isReinitializing else {
+            print("Server re-init already in progress, skipping")
+            return
+        }
+
         let conn = connectionsByID.first
         if conn == nil ||
             conn?.value.connection.state == .cancelled {
+            isReinitializing = true
             stopListener()
             setupListener()
+
+            // Wait for the Elixir-side ranch listener to finish suspend/resume,
+            // then reconnect LiveView WebSocket.
+            // The ":reconnect" message sent in didAccept() triggers ranch
+            // suspend → resume on the Elixir side. We need to give it time
+            // to complete before the WebSocket reconnects.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                self?.reconnectWebSocket()
+                self?.isReinitializing = false
+            }
+        } else {
+            // Connection still alive, just reconnect the WebSocket
+            reconnectWebSocket()
         }
+    }
+
+    /// Inject JavaScript to reconnect the LiveView WebSocket.
+    /// Polls the Phoenix HTTP server until it's ready, then triggers
+    /// the LiveSocket connect to avoid "reconnect" / "something went wrong" flashes.
+    private func reconnectWebSocket() {
+        guard let url = self.lastURL else {
+            print("Bridge: no URL to reconnect to")
+            return
+        }
+        print("Bridge: triggering LiveView WebSocket reconnect")
+        webview?.evaluateJavaScript("""
+            window.__bridgeSuspended = false;
+            (function reconnectLiveView() {
+                // Poll the server until it responds, then reconnect LiveSocket
+                fetch('\(url.absoluteString)', {method: 'HEAD', cache: 'no-store'})
+                    .then(function() {
+                        if (window.liveSocket) {
+                            window.liveSocket.connect();
+                        }
+                    })
+                    .catch(function() {
+                        // Server not ready yet, retry after 200ms
+                        setTimeout(reconnectLiveView, 200);
+                    });
+            })();
+        """)
     }
 
     static func port() -> NWEndpoint.Port {
