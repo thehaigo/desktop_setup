@@ -44,20 +44,35 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
             "var head = document.getElementsByTagName('head')[0];" +
             "head.appendChild(meta);")
         
-        // adding debug output
-        addScript(configuration, "window.onerror = (msg, url, line, column, error) => { " +
-          "const message = {" +
-          "  message: msg," +
-          "  url: url," +
-          "  line: line," +
-          "  column: column," +
-          "  error: JSON.stringify(error)" +
-          "}" +
-          "if (window.webkit) {" +
-          "  window.webkit.messageHandlers.error.postMessage(message);" +
-          "}" +
-          "};")
-        configuration.userContentController.add(self, name: "error")
+        // Forward JS console messages to Xcode console
+        addScript(configuration, """
+            (function() {
+                const levels = ['log', 'warn', 'error', 'info', 'debug'];
+                levels.forEach(function(level) {
+                    const original = console[level];
+                    console[level] = function() {
+                        const args = Array.prototype.slice.call(arguments).map(function(arg) {
+                            try { return typeof arg === 'object' ? JSON.stringify(arg) : String(arg); }
+                            catch(e) { return String(arg); }
+                        });
+                        if (window.webkit && window.webkit.messageHandlers.consoleLog) {
+                            window.webkit.messageHandlers.consoleLog.postMessage(
+                                { level: level, message: args.join(' ') }
+                            );
+                        }
+                        original.apply(console, arguments);
+                    };
+                });
+                window.onerror = function(msg, url, line, column, error) {
+                    if (window.webkit && window.webkit.messageHandlers.consoleLog) {
+                        window.webkit.messageHandlers.consoleLog.postMessage(
+                            { level: 'error', message: msg + ' (' + url + ':' + line + ':' + column + ')' }
+                        );
+                    }
+                };
+            })();
+        """)
+        configuration.userContentController.add(self, name: "consoleLog")
         
         // fixing the onlick event
         // https://stackoverflow.com/a/27525707
@@ -104,9 +119,12 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
                     UIApplication.shared.open(url)
                 }
             }
-        case "error":
-            let error = (message.body as? [String: Any])?["message"] as? String ?? "unknown"
-            print("WebView JS error: \(error)")
+        case "consoleLog":
+            if let body = message.body as? [String: Any],
+               let level = body["level"] as? String,
+               let msg = body["message"] as? String {
+                print("JS [\(level)] \(msg)")
+            }
         default:
             print("WebView: received unknown message: \(message.name)")
         }
