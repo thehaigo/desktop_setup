@@ -7,14 +7,10 @@ set -e
 
 # This loads nvm
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-# This loads asdf
-if [ -s "$HOMEBREW_PREFIX/opt/asdf/libexec/asdf.sh" ]; then 
-  \. "$HOMEBREW_PREFIX/opt/asdf/libexec/asdf.sh" 
-elif [ -s "$HOME/.asdf/asdf.sh" ]; then
-  \. "$HOME/.asdf/asdf.sh"
-fi
+# This loads mise
+eval "$(mise activate bash)"
 
 
 BASE=`pwd`
@@ -28,8 +24,7 @@ mix local.rebar --force --if-missing
 cd ../../
 
 
-asdf set erlang 28.3.1
-asdf set elixir 1.19.5-otp-28
+mise use erlang@28.3.1 elixir@1.19.5-otp-28
 
 
 if [ ! -d "deps/desktop" ]; then
@@ -48,5 +43,4 @@ fi
   mix release --overwrite && \
   mix assets.deploy && \
   cd _build/ios_prod/rel/template_app && \
-  zip -9r "$BASE/TemplateApp/app.zip" lib/ releases/ --exclude "*.so"  
-
+  zip -9r "$BASE/TemplateApp/app.zip" lib/ releases/ --exclude "*.so"

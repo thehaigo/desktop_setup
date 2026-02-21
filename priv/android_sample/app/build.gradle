@@ -18,8 +18,8 @@ android {
         environment "PATH", [
                 "/opt/homebrew/bin",
                 "/usr/local/bin",
-                "${home}/.asdf/shims",
-                "${home}/.asdf/bin",
+                "${home}/.local/bin",
+                "${home}/.local/share/mise/shims",
                 System.getenv("PATH")
         ].join(":")
         environment "MIX_ENV", "prod"

@@ -8,12 +8,10 @@ export MIX_TARGET=android
 
 cd ../../../
 
+# This loads mise
+eval "$(mise activate bash)"
 
-asdf set -u erlang 28.3.1
-asdf set -u elixir 1.19.5-otp-28
-
-
-export PATH="$HOME/.asdf/shims:$HOME/.asdf/bin:$PATH"
+mise use erlang@28.3.1 elixir@1.19.5-otp-28
 
 
 STRIP_SHIM_DIR="$(mktemp -d)"
@@ -49,4 +47,3 @@ TMP_DIR="$(mktemp -d)"
 rsync -a "$REL_DIR/" "$TMP_DIR/"
 chmod -R u+w "$TMP_DIR"
 ( cd "$TMP_DIR" && zip -9r "$APP_FILE" lib/ releases/ --exclude "*.so" )
-
