@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE=`pwd`
+BASE="$(pwd)"
 APP_FILE="$BASE/src/main/assets/app.zip"
 export MIX_ENV=prod
 export MIX_TARGET=android
 
 cd ../../../
 
-# This loads mise
+# This loads mise (.tool-versions specifies erlang/elixir versions)
 eval "$(mise activate bash)"
 
-mise use erlang@28.3.1 elixir@1.19.5-otp-28
-
-
+# no-op strip shim to avoid macOS strip breaking Android ELF .so files
 STRIP_SHIM_DIR="$(mktemp -d)"
+cleanup() { rm -rf "$STRIP_SHIM_DIR" "$TMP_DIR" 2>/dev/null || true; }
+trap cleanup EXIT
+
 cat > "${STRIP_SHIM_DIR}/strip" <<'EOS'
 #!/usr/bin/env bash
-# no-op strip to avoid breaking ELF .so on macOS
 exit 0
 EOS
 chmod +x "${STRIP_SHIM_DIR}/strip"
@@ -25,17 +25,12 @@ export PATH="${STRIP_SHIM_DIR}:$PATH"
 export STRIP=/usr/bin/true
 export DEVELOPER_DIR=""
 
-#mkdir -p "$(dirname "$APP_FILE")"
-#rm -f "$APP_FILE"
+mix local.hex --force --if-missing
+mix local.rebar --force --if-missing
 
-#cd "$ELIXIR_DIR"
-
-
-#rm -rf _build
-mix do local.hex --force, local.rebar --force
-mix deps.get
-
-# (cd assets && npm ci && npm run build)
+if [ ! -d "deps/desktop" ]; then
+  mix deps.get
+fi
 
 mix release --overwrite
 mix assets.deploy
