@@ -321,6 +321,57 @@ class Bridge(
         return server.localPort
     }
 
+    /**
+     * Disconnect LiveView WebSocket before going to background.
+     * Prevents LiveView JS from attempting reconnections while
+     * Android has the app in the background with throttled networking.
+     */
+    fun suspendWebSocket() {
+        Log.d("Bridge", "Suspending LiveView WebSocket")
+        webview.post {
+            webview.evaluateJavascript("""
+                (function() {
+                    if (window.__bridgeSuspended) return;
+                    window.__bridgeSuspended = true;
+                    if (window.liveSocket) {
+                        window.liveSocket.disconnect();
+                    }
+                })();
+            """.trimIndent(), null)
+        }
+    }
+
+    /**
+     * Reconnect LiveView WebSocket after returning to foreground.
+     * Polls the Phoenix HTTP server until it responds, then triggers
+     * liveSocket.connect() to avoid "reconnect" / "something went wrong" flashes.
+     */
+    fun reconnectWebSocket() {
+        if (lastURL.isBlank()) {
+            Log.d("Bridge", "No URL to reconnect to")
+            return
+        }
+        Log.d("Bridge", "Triggering LiveView WebSocket reconnect")
+        webview.post {
+            webview.evaluateJavascript("""
+                (function() {
+                    window.__bridgeSuspended = false;
+                    (function reconnectLiveView() {
+                        fetch('$lastURL', {method: 'HEAD', cache: 'no-store'})
+                            .then(function() {
+                                if (window.liveSocket) {
+                                    window.liveSocket.connect();
+                                }
+                            })
+                            .catch(function() {
+                                setTimeout(reconnectLiveView, 200);
+                            });
+                    })();
+                })();
+            """.trimIndent(), null)
+        }
+    }
+
     private fun handle(reader : DataInputStream, writer : DataOutputStream) {
         val ref = ByteArray(8)
 

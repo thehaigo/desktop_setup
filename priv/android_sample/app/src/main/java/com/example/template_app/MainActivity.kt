@@ -50,6 +50,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Proactively disconnect LiveView WebSocket before Android
+        // throttles the app's networking in the background.
+        if (::bridge.isInitialized) {
+            bridge.suspendWebSocket()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Reconnect LiveView WebSocket after returning to foreground.
+        // The TCP Bridge connection stays alive on Android, so we only
+        // need to re-establish the LiveView WebSocket.
+        if (::bridge.isInitialized) {
+            bridge.reconnectWebSocket()
+        }
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_BACK) {
             if (webView.canGoBack()) {
