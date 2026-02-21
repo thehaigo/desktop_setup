@@ -2,6 +2,7 @@ package com.example.template_app
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -10,11 +11,14 @@ import android.os.Build
 import android.os.Message
 import android.system.Os
 import android.util.Log
+import android.webkit.JsPromptResult
+import android.webkit.JsResult
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.EditText
 import androidx.core.content.FileProvider
 import org.json.JSONArray
 import java.net.ServerSocket
@@ -284,6 +288,44 @@ class Bridge(
                         return true
                     }
                 }
+                return true
+            }
+
+            override fun onJsAlert(
+                view: WebView?, url: String?, message: String?, result: JsResult?
+            ): Boolean {
+                AlertDialog.Builder(activity)
+                    .setMessage(message)
+                    .setPositiveButton("OK") { _, _ -> result?.confirm() }
+                    .setOnCancelListener { result?.cancel() }
+                    .show()
+                return true
+            }
+
+            override fun onJsConfirm(
+                view: WebView?, url: String?, message: String?, result: JsResult?
+            ): Boolean {
+                AlertDialog.Builder(activity)
+                    .setMessage(message)
+                    .setPositiveButton("OK") { _, _ -> result?.confirm() }
+                    .setNegativeButton("Cancel") { _, _ -> result?.cancel() }
+                    .setOnCancelListener { result?.cancel() }
+                    .show()
+                return true
+            }
+
+            override fun onJsPrompt(
+                view: WebView?, url: String?, message: String?,
+                defaultValue: String?, result: JsPromptResult?
+            ): Boolean {
+                val input = EditText(activity).apply { setText(defaultValue) }
+                AlertDialog.Builder(activity)
+                    .setMessage(message)
+                    .setView(input)
+                    .setPositiveButton("OK") { _, _ -> result?.confirm(input.text.toString()) }
+                    .setNegativeButton("Cancel") { _, _ -> result?.cancel() }
+                    .setOnCancelListener { result?.cancel() }
+                    .show()
                 return true
             }
         }

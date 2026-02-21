@@ -11,7 +11,7 @@ import SwiftUI
 import UIKit
 import WebKit
 
-final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+final class WebView: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     var webview: WKWebView
     var finish: (() -> ())?
     
@@ -83,6 +83,7 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         """)
         
         webview.navigationDelegate = self
+        webview.uiDelegate = self
     }
     
     func addScript(_ config: WKWebViewConfiguration, _ script: String) {
@@ -111,6 +112,65 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         }
     }
     
+    // MARK: - WKUIDelegate (JS alert / confirm / prompt)
+
+    func webView(_ webView: WKWebView,
+                 runJavaScriptAlertPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping () -> Void) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            completionHandler()
+        })
+        topViewController()?.present(alert, animated: true)
+    }
+
+    func webView(_ webView: WKWebView,
+                 runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (Bool) -> Void) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+            completionHandler(false)
+        })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            completionHandler(true)
+        })
+        topViewController()?.present(alert, animated: true)
+    }
+
+    func webView(_ webView: WKWebView,
+                 runJavaScriptTextInputPanelWithPrompt prompt: String,
+                 defaultText: String?,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (String?) -> Void) {
+        let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.text = defaultText
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+            completionHandler(nil)
+        })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            completionHandler(alert.textFields?.first?.text)
+        })
+        topViewController()?.present(alert, animated: true)
+    }
+
+    /// Find the topmost presented view controller to present alerts on.
+    private func topViewController() -> UIViewController? {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              var vc = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
+            return nil
+        }
+        while let presented = vc.presentedViewController {
+            vc = presented
+        }
+        return vc
+    }
+
+    // MARK: - WKScriptMessageHandler
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         switch message.name {
         case "openSafari":
