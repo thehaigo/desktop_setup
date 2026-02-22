@@ -37,6 +37,8 @@ final class WebView: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessa
         
         configuration.userContentController.add(self, name: "openSafari")
         configuration.userContentController.add(self, name: "consoleLog")
+        configuration.userContentController.add(self, name: "error")
+        configuration.userContentController.add(self, name: "forceReconnect")
 
         // fixing the zoom level
         addScript(configuration, "var meta = document.createElement('meta');" +

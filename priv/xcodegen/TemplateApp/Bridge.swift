@@ -172,6 +172,27 @@ class Bridge {
         """)
     }
 
+    /// Force-reset all connections and reload the page.
+    /// Called from JavaScript via the `forceReconnect` message handler
+    /// when the WebView detects an unrecoverable connection issue.
+    func forceReconnect() {
+        print("Bridge: forceReconnect — tearing down all connections")
+        connectionsQueue.sync {
+            for connection in self.connectionsByID.values {
+                connection.didStopCallback = nil
+                connection.stop()
+            }
+            self.connectionsByID.removeAll()
+        }
+
+        stopListener()
+        setupListener()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.loadURL()
+        }
+    }
+
     /// Open a URL in the system default browser (Safari).
     func launchDefaultBrowser(urlString: String) {
         guard let url = URL(string: urlString) else { return }
