@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Message
 import android.system.Os
 import android.util.Log
+import android.webkit.ConsoleMessage
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.ValueCallback
@@ -40,7 +41,7 @@ class Bridge(
 
     private val server = ServerSocket(0)
     private var lastURL = String()
-    private val assets = applicationContext.assets.list("")
+    private val assets = applicationContext.assets.list("") ?: emptyArray()
     private val writerLock = ReentrantLock()
 
 
@@ -53,20 +54,24 @@ class Bridge(
         setWebView(webview)
 
         thread(start = true) {
-            while (true) {
-                val socket = server.accept()
-                socket.tcpNoDelay = true
-                Log.d("Bridge", "Client connected: ${socket.inetAddress.hostAddress}")
-                thread {
-                    val reader = DataInputStream(BufferedInputStream((socket.getInputStream())))
-                    val writer = DataOutputStream(socket.getOutputStream())
-                    try {
-                        handle(reader, writer)
-                    } catch(e : EOFException) {
-                        Log.d("Bridge", "Client disconnected: ${socket.inetAddress.hostAddress}")
-                        socket.close()
+            try {
+                while (!server.isClosed) {
+                    val socket = server.accept()
+                    socket.tcpNoDelay = true
+                    Log.d("Bridge", "Client connected: ${socket.inetAddress.hostAddress}")
+                    thread {
+                        val reader = DataInputStream(BufferedInputStream((socket.getInputStream())))
+                        val writer = DataOutputStream(socket.getOutputStream())
+                        try {
+                            handle(reader, writer)
+                        } catch(e : EOFException) {
+                            Log.d("Bridge", "Client disconnected: ${socket.inetAddress.hostAddress}")
+                            socket.close()
+                        }
                     }
                 }
+            } catch (e: java.net.SocketException) {
+                Log.d("Bridge", "Server socket closed: ${e.message}")
             }
         }
 
@@ -169,7 +174,6 @@ class Bridge(
 
 
     private fun unpackAsset(releaseDir: String, assetName: String): Boolean {
-        assets!!
         if (assets.contains("$assetName.zip")) {
             val input = BufferedInputStream(applicationContext.assets.open("$assetName.zip"))
             return unpackZip(releaseDir, input)
@@ -328,6 +332,19 @@ class Bridge(
                     .show()
                 return true
             }
+
+            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                consoleMessage?.let {
+                    val level = when (it.messageLevel()) {
+                        ConsoleMessage.MessageLevel.ERROR -> "ERROR"
+                        ConsoleMessage.MessageLevel.WARNING -> "WARN"
+                        ConsoleMessage.MessageLevel.DEBUG -> "DEBUG"
+                        else -> "LOG"
+                    }
+                    Log.d("JS", "[$level] ${it.message()} (${it.sourceId()}:${it.lineNumber()})")
+                }
+                return true
+            }
         }
     }
 
@@ -434,9 +451,13 @@ class Bridge(
                 }
             }
             writerLock.lock()
-            writer.writeInt(response.size)
-            writer.write(response)
-            writerLock.unlock()        }
+            try {
+                writer.writeInt(response.size)
+                writer.write(response)
+            } finally {
+                writerLock.unlock()
+            }
+        }
     }
 
     fun onFilePickerResult(resultCode: Int, data: Intent?) {
@@ -448,6 +469,11 @@ class Bridge(
     fun dispose() {
         filePathCallback?.onReceiveValue(null)
         filePathCallback = null
+        try {
+            server.close()
+        } catch (e: Exception) {
+            Log.d("Bridge", "Error closing server socket: ${e.message}")
+        }
     }
 
 
