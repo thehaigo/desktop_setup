@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
 }
 
 def erlangLibsDir = new File(project.rootDir, "erlang-libs")
@@ -24,15 +25,59 @@ android {
         environment "MIX_TARGET", "android"
     }
 
+    // Extract ELF binaries from runtime zips into jniLibs so Android
+    // packages them in the native library directory (which is executable).
+    // Bridge.kt creates symlinks from bin/<name> -> nativeDir/lib__<name>.so
+    tasks.register("extractRuntimeBinaries") {
+        def assetsDir = file("src/main/assets")
+        def jniLibsDir = file("src/main/jniLibs")
+        def abis = ["arm64-v8a", "armeabi-v7a", "x86_64"]
+        def elfBinaries = ["inet_gethost", "erl_child_setup", "heart", "epmd", "erlexec"]
+
+        inputs.dir(assetsDir)
+        outputs.dir(jniLibsDir)
+
+        doLast {
+            abis.each { abi ->
+                def zipFile = new File(assetsDir, "${abi}-runtime.zip")
+                if (!zipFile.exists()) return
+
+                def outDir = new File(jniLibsDir, abi)
+                outDir.mkdirs()
+
+                def zis = new java.util.zip.ZipInputStream(
+                    new java.io.BufferedInputStream(new java.io.FileInputStream(zipFile))
+                )
+                def entry
+                while ((entry = zis.nextEntry) != null) {
+                    def name = new File(entry.name).name
+                    if (elfBinaries.contains(name)) {
+                        def dest = new File(outDir, "lib__${name}.so")
+                        dest.withOutputStream { os ->
+                            def buf = new byte[8192]
+                            int len
+                            while ((len = zis.read(buf)) != -1) {
+                                os.write(buf, 0, len)
+                            }
+                        }
+                    }
+                    zis.closeEntry()
+                }
+                zis.close()
+            }
+        }
+    }
+
     plugins.withId("com.android.application") {
         tasks.named("preBuild").configure {
             dependsOn(tasks.named("buildElixirRelease"))
+            dependsOn(tasks.named("extractRuntimeBinaries"))
         }
     }
 
     defaultConfig {
         applicationId "com.example.template_app"
-        minSdk 23
+        minSdk 26
         targetSdk 36
         versionCode 1
         versionName "1.0"
@@ -62,7 +107,9 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    kotlin { jvmToolchain(17) }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 
 
     externalNativeBuild {
