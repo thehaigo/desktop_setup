@@ -32,6 +32,10 @@ if [ ! -d "deps/desktop" ]; then
   mix deps.get
 fi
 
+if grep -q ":ecto_sqlite3" mix.exs; then
+  mix desktop.migrations.convert
+fi
+
 mix release --overwrite
 mix assets.deploy
 
