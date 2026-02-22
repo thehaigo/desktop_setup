@@ -36,6 +36,7 @@ final class WebView: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessa
         super.init()
         
         configuration.userContentController.add(self, name: "openSafari")
+        configuration.userContentController.add(self, name: "consoleLog")
 
         // fixing the zoom level
         addScript(configuration, "var meta = document.createElement('meta');" +
@@ -72,7 +73,7 @@ final class WebView: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessa
                 };
             })();
         """)
-        configuration.userContentController.add(self, name: "consoleLog")
+        
         
         // fixing the onlick event
         // https://stackoverflow.com/a/27525707
@@ -185,8 +186,36 @@ final class WebView: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessa
                let msg = body["message"] as? String {
                 print("JS [\(level)] \(msg)")
             }
+        case "error":
+            // You should actually handle the error :)
+            let error = (message.body as? [String: Any])?["message"] as? String ?? "unknown"
+            assertionFailure("JavaScript error: \(error)")
+        case "forceReconnect":
+            print("[WebView] forceReconnect called from JS")
+            // Bridge経由で接続を強制リセットしてWebViewを再読み込み
+            DispatchQueue.main.async {
+                if let bridge = Bridge.instance {
+                    bridge.forceReconnect()
+                } else {
+                    // Bridgeがない場合はフォールバックでリロード
+                    self.webview.reload()
+                }
+            }
         default:
             print("WebView: received unknown message: \(message.name)")
         }
+    }
+
+    // call Native -> JS 
+    private func evalJavaScript(message: String) {
+        let executeScript: String = "window.callFromNative(\"\(message)\");"
+        webview.evaluateJavaScript(executeScript, completionHandler: { (object, error) -> Void in
+            if let object = object {
+                print(object)
+            }
+            if let error = error {
+                print(error)
+            }
+        })
     }
 }

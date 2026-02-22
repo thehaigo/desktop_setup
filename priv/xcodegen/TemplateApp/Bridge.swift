@@ -281,6 +281,7 @@ class Bridge {
             l.stateUpdateHandler = nil
             l.newConnectionHandler = nil
             l.cancel()
+            listener = nil
         }
     }
 

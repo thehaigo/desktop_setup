@@ -31,6 +31,7 @@ struct TemplateApp: App {
                 if let bridge = Bridge.instance {
                     bridge.reinit()
                 }
+
             default: break
             }
         }
