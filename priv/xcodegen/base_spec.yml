@@ -16,3 +16,6 @@ settings:
   GENERATE_INFOPLIST_FILE: YES
   MARKETING_VERSION: 1.0
   ENABLE_USER_SCRIPT_SANDBOXING: NO
+  INFOPLIST_KEY_NSCameraUsageDescription: "This app needs camera access to upload photos"
+  INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "This app needs photo library access to upload images"
+  INFOPLIST_KEY_NSMicrophoneUsageDescription: "This app needs microphone access for video recording"

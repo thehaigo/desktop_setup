@@ -77,7 +77,7 @@ final class WebView: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessa
         // fixing the onlick event
         // https://stackoverflow.com/a/27525707
         addScript(configuration, """
-            document.getElementsByTagName('a').forEach(node => {
+            document.querySelectorAll('a').forEach(node => {
                 node.style.cursor = "pointer";
             })
         """)
