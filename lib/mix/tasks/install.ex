@@ -2,13 +2,13 @@ defmodule Mix.Tasks.Desktop.Install do
   @moduledoc "Installer Mix task for Elixir Desktop: `mix desktop.install`"
   use Mix.Task
 
-  @shortdoc "Setup ElixrDesktop app"
+  @shortdoc "Setup ElixirDesktop app"
   def run(args) do
     {parsed_args, _, _} =
       OptionParser.parse(args, strict: [namespace: :string, os: :string, database: :string])
 
-    host_project_config = Util.get_host_project_config(parsed_args)
-    database = get_database(host_project_config) |> IO.inspect()
+    host_project_config = DesktopSetup.Util.get_host_project_config(parsed_args)
+    database = get_database(host_project_config)
 
     update_config_exs_if_needed(host_project_config)
     update_endpoint_ex_if_needed(host_project_config)
@@ -48,13 +48,10 @@ defmodule Mix.Tasks.Desktop.Install do
     else
       Owl.IO.puts([Owl.Data.tag("* updating ", :yellow), "config/config.exs"])
 
-      {:ok, app_config} = File.open(path, [:write])
-
       updated_app_config_body =
         String.replace(app_config_body, "url: [host: \"localhost\"],", full_replace_string)
 
-      IO.binwrite(app_config, updated_app_config_body)
-      File.close(app_config)
+      File.write!(path, updated_app_config_body)
     end
   end
 
@@ -71,14 +68,11 @@ defmodule Mix.Tasks.Desktop.Install do
     else
       Owl.IO.puts([Owl.Data.tag("* updating ", :yellow), "endpoint.ex"])
 
-      {:ok, app_config} = File.open(path, [:write])
-
       updated_config_body =
         config_body
         |> String.replace(~r/@session_options \[[\s\S]*?\]/, full_replace_string)
 
-      IO.binwrite(app_config, updated_config_body)
-      File.close(app_config)
+      File.write!(path, updated_config_body)
     end
   end
 
@@ -95,14 +89,11 @@ defmodule Mix.Tasks.Desktop.Install do
     else
       Owl.IO.puts([Owl.Data.tag("* updating ", :yellow), "mix.exs"])
 
-      {:ok, app_config} = File.open(path, [:write])
-
       updated_config_body =
         config_body
         |> String.replace(~r/#{app_namespace}.Application/, app_namespace)
 
-      IO.binwrite(app_config, updated_config_body)
-      File.close(app_config)
+      File.write!(path, updated_config_body)
     end
   end
 
@@ -131,8 +122,6 @@ defmodule Mix.Tasks.Desktop.Install do
     else
       Owl.IO.puts([Owl.Data.tag("* updating ", :yellow), "mix.exs"])
 
-      {:ok, app_config} = File.open(path, [:write])
-
       updated_config_body =
         config_body
         |> String.replace(
@@ -140,8 +129,7 @@ defmodule Mix.Tasks.Desktop.Install do
           "defp deps do\n    \[\n       {:desktop, \"~> 1.5\"}, \n{:wx, \"~> 1.1\", hex: :bridge, targets: [:android, :ios]},\n {:plug_crypto, github: \"thehaigo/plug_crypto\", override: true},\n #{if database == :sqlite, do: "{:exqlite, github: \"elixir-desktop/exqlite\", override: true},\n", else: ""}"
         )
 
-      IO.binwrite(app_config, updated_config_body)
-      File.close(app_config)
+      File.write!(path, updated_config_body)
       System.cmd("mix", ["deps.get"])
     end
   end
@@ -164,12 +152,9 @@ defmodule Mix.Tasks.Desktop.Install do
     else
       Owl.IO.puts([Owl.Data.tag("* updating ", :yellow), "#{app_name}.ex"])
 
-      {:ok, app_config} = File.open(path, [:write])
-
       updated_config_body = application_body(app_name, app_namespace, config_path, database)
 
-      IO.binwrite(app_config, updated_config_body)
-      File.close(app_config)
+      File.write!(path, updated_config_body)
     end
   end
 
@@ -273,8 +258,6 @@ defmodule Mix.Tasks.Desktop.Install do
     else
       Owl.IO.puts([Owl.Data.tag("* updating ", :yellow), "repo.ex"])
 
-      {:ok, repo_config} = File.open(path, [:write])
-
       updated_config_body =
         repo_body
         |> String.replace(
@@ -300,8 +283,7 @@ defmodule Mix.Tasks.Desktop.Install do
           """
         )
 
-      IO.binwrite(repo_config, updated_config_body)
-      File.close(repo_config)
+      File.write!(path, updated_config_body)
     end
   end
 
@@ -318,8 +300,6 @@ defmodule Mix.Tasks.Desktop.Install do
       IO.puts("prod.exs deps already modified, skipping...")
     else
       Owl.IO.puts([Owl.Data.tag("* updating ", :yellow), "prod.ex"])
-
-      {:ok, repo_config} = File.open(path, [:write])
 
       updated_config_body =
         repo_body
@@ -346,8 +326,7 @@ defmodule Mix.Tasks.Desktop.Install do
           """
         )
 
-      IO.binwrite(repo_config, updated_config_body)
-      File.close(repo_config)
+      File.write!(path, updated_config_body)
     end
   end
 
@@ -384,13 +363,13 @@ defmodule Mix.Tasks.Desktop.Install do
     end
   end
 
-  def rename_runtime_exs_if_needed(%{runtime_path: path}) do
+  defp rename_runtime_exs_if_needed(%{runtime_path: path}) do
     if File.exists?(path) do
       Owl.IO.puts([Owl.Data.tag("* renaming ", :yellow), "runtime.exs"])
       current_path = File.cwd!()
       File.rename(path, "#{current_path}/config/disabled_runtime.exs")
     else
-      IO.puts("rumtime.exs already renamed, skipping...")
+      IO.puts("runtime.exs already renamed, skipping...")
     end
   end
 
@@ -398,7 +377,7 @@ defmodule Mix.Tasks.Desktop.Install do
     System.cmd("mix", ["format"])
   end
 
-  def clean_build_path(%{build_path: build_path}) do
+  defp clean_build_path(%{build_path: build_path}) do
     # Clear _build path to ensure it's rebuilt with new Config
     File.rm_rf(build_path)
   end
