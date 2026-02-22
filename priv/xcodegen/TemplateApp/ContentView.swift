@@ -38,17 +38,36 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            DispatchQueue.main.async {
+            // Bridge init is lightweight (no I/O).
+            // Heavy zip extraction runs on a background thread to
+            // avoid blocking the UI and triggering the watchdog.
+            let bridge: Bridge
+            do {
+                bridge = try Bridge()
+            } catch {
+                print("Bridge init failed: \(error)")
+                self.errorMessage = error.localizedDescription
+                return
+            }
+
+            DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let bridge = try Bridge()
+                    try bridge.extractAppIfNeeded()
+                } catch {
+                    DispatchQueue.main.async {
+                        print("Bridge extract failed: \(error)")
+                        self.errorMessage = error.localizedDescription
+                    }
+                    return
+                }
+
+                DispatchQueue.main.async {
+                    bridge.setupListener()
                     self.webview = WebViewController()
                     self.webview?.webview.onFinish {
                         self.isActive = true
                     }
                     bridge.setWebView(view: self.webview!)
-                } catch {
-                    print("Bridge init failed: \(error)")
-                    self.errorMessage = error.localizedDescription
                 }
             }
         }

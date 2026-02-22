@@ -10,6 +10,20 @@ import Network
 import ZIPFoundation
 import SwiftUI
 
+enum BridgeError: LocalizedError {
+    case missingAppZip
+    case missingBundleIdentifier
+
+    var errorDescription: String? {
+        switch self {
+        case .missingAppZip:
+            return "app.zip not found in application bundle"
+        case .missingBundleIdentifier:
+            return "Bundle identifier is missing"
+        }
+    }
+}
+
 class Bridge {
     var webview: WebViewController?
     var listener: NWListener?
@@ -37,14 +51,23 @@ class Bridge {
     }
 
     private var connectionsByID: [Int: ServerConnection] = [:]
+    private let connectionsQueue = DispatchQueue(label: "bridge.connections")
 
     init() throws {
+        guard let bundleID = Bundle.main.bundleIdentifier else {
+            throw BridgeError.missingBundleIdentifier
+        }
         home = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(Bundle.main.bundleIdentifier!)
+            .appendingPathComponent(bundleID)
 
-        // Extracting the app
-        let infoAttr = try FileManager.default.attributesOfItem(atPath: zipFile().path)
-        let infoDate = infoAttr[FileAttributeKey.creationDate] as! Date
+        Bridge.instance = self
+    }
+
+    /// Extract app.zip and write inetrc. Safe to call from a background thread.
+    func extractAppIfNeeded() throws {
+        let zipURL = try zipFile()
+        let infoAttr = try FileManager.default.attributesOfItem(atPath: zipURL.path)
+        let infoDate = (infoAttr[FileAttributeKey.creationDate] as? Date) ?? Date.distantPast
         let build = UserDefaults.standard.string(forKey: "app_build_date")
 
         let appdir = home.appendingPathComponent("app")
@@ -68,8 +91,6 @@ class Bridge {
         {lookup, [dns]}.
         """#
         try rc.write(to: inet_rc, atomically: true, encoding: .utf8)
-
-        Bridge.instance = self
     }
 
     func setupListener() {
@@ -103,8 +124,18 @@ class Bridge {
     func reinit() {
         guard !isReinitializing else { return }
 
-        let conn = connectionsByID.first
-        if conn == nil || conn?.value.connection.state == .cancelled {
+        let needsRestart = connectionsQueue.sync {
+            connectionsByID.isEmpty || connectionsByID.values.allSatisfy { conn in
+                switch conn.connection.state {
+                case .cancelled, .failed:
+                    return true
+                default:
+                    return false
+                }
+            }
+        }
+
+        if needsRestart {
             isReinitializing = true
             stopListener()
             setupListener()
@@ -142,7 +173,7 @@ class Bridge {
     }
 
     /// Open a URL in the system default browser (Safari).
-    private func launchDefaultBrowser(urlString: String) {
+    func launchDefaultBrowser(urlString: String) {
         guard let url = URL(string: urlString) else { return }
         DispatchQueue.main.async {
             UIApplication.shared.open(url)
@@ -150,7 +181,7 @@ class Bridge {
     }
 
     /// Return the current device locale in the format "language_COUNTRY" (e.g. "en_US").
-    private func currentLocaleIdentifier() -> String {
+    func currentLocaleIdentifier() -> String {
         let locale = Locale.current
         let language = locale.language.languageCode?.identifier ?? "en"
         let country = locale.region?.identifier ?? "US"
@@ -158,28 +189,34 @@ class Bridge {
     }
 
     static func port() -> NWEndpoint.Port {
-        let value = UserDefaults.standard.string(forKey: "port")
-        let port: String
-        if value == nil {
-            port = String(20000 + Int.random(in: 1...20000))
-            UserDefaults.standard.set(port, forKey: "port")
-        } else {
-            port = value!
+        let port = UserDefaults.standard.string(forKey: "port")
+            ?? {
+                let p = String(20000 + Int.random(in: 1...20000))
+                UserDefaults.standard.set(p, forKey: "port")
+                return p
+            }()
+        guard let nwPort = NWEndpoint.Port(port) else {
+            let fallback = String(20000 + Int.random(in: 1...20000))
+            UserDefaults.standard.set(fallback, forKey: "port")
+            return NWEndpoint.Port(fallback)!
         }
-        return NWEndpoint.Port(port)!
+        return nwPort
     }
 
     func setEnv(name: String, value: String) {
         setenv(name, value, 1)
     }
 
-    func zipFile() -> URL {
-        return Bundle.main.url(forResource: "app", withExtension: "zip")!
+    func zipFile() throws -> URL {
+        guard let url = Bundle.main.url(forResource: "app", withExtension: "zip") else {
+            throw BridgeError.missingAppZip
+        }
+        return url
     }
 
     func unzipApp(dest: URL) throws {
         try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true, attributes: nil)
-        try FileManager.default.unzipItem(at: zipFile(), to: dest)
+        try FileManager.default.unzipItem(at: try zipFile(), to: dest)
     }
 
     func stateDidChange(to newState: NWListener.State) {
@@ -188,8 +225,14 @@ class Bridge {
             if erlangStarted { break }
             erlangStarted = true
             print("Bridge: server ready, starting Erlang")
+
+            guard let portValue = listener?.port?.rawValue else {
+                print("Bridge: ERROR — listener port is nil, cannot start Erlang")
+                return
+            }
+
             setEnv(name: "ELIXIR_DESKTOP_OS", value: "ios")
-            setEnv(name: "BRIDGE_PORT", value: (listener?.port?.rawValue.description)!)
+            setEnv(name: "BRIDGE_PORT", value: String(portValue))
             setEnv(name: "HOME", value: home.path)
             let bindir = home.appendingPathComponent("bin")
             setEnv(name: "BINDIR", value: bindir.path)
@@ -198,14 +241,13 @@ class Bridge {
             let logdir = urls[0].path
             let appdir = home.appendingPathComponent("app")
             let ret = start_erlang(appdir.path, logdir)
-            print("Bridge: erlang start returned: " + String(cString: ret!))
+            let result = ret.map { String(cString: $0) } ?? "nil"
+            print("Bridge: erlang start returned: " + result)
 
         case .failed(let error):
             print("Bridge: server failure: \(error.localizedDescription)")
-            exit(EXIT_FAILURE)
         case .cancelled:
             print("Bridge: server cancelled")
-            exit(EXIT_FAILURE)
         default:
             break
         }
@@ -213,7 +255,9 @@ class Bridge {
 
     private func didAccept(nwConnection: NWConnection) {
         let connection = ServerConnection(nwConnection: nwConnection, bridge: self)
-        self.connectionsByID[connection.id] = connection
+        connectionsQueue.sync {
+            self.connectionsByID[connection.id] = connection
+        }
         connection.didStopCallback = { _ in
             self.connectionDidStop(connection)
         }
@@ -227,7 +271,9 @@ class Bridge {
     }
 
     private func connectionDidStop(_ connection: ServerConnection) {
-        self.connectionsByID.removeValue(forKey: connection.id)
+        connectionsQueue.sync {
+            self.connectionsByID.removeValue(forKey: connection.id)
+        }
     }
 
     private func stopListener() {
@@ -240,11 +286,13 @@ class Bridge {
 
     private func stop() {
         stopListener()
-        for connection in self.connectionsByID.values {
-            connection.didStopCallback = nil
-            connection.stop()
+        connectionsQueue.sync {
+            for connection in self.connectionsByID.values {
+                connection.didStopCallback = nil
+                connection.stop()
+            }
+            self.connectionsByID.removeAll()
         }
-        self.connectionsByID.removeAll()
     }
 }
 
@@ -252,6 +300,7 @@ class ServerConnection {
     let MTU = 65536
 
     private static var nextID: Int = 0
+    private static let idLock = NSLock()
     let connection: NWConnection
     let id: Int
     var bridge: Bridge
@@ -259,8 +308,10 @@ class ServerConnection {
     init(nwConnection: NWConnection, bridge: Bridge) {
         self.bridge = bridge
         connection = nwConnection
+        ServerConnection.idLock.lock()
         id = ServerConnection.nextID
         ServerConnection.nextID += 1
+        ServerConnection.idLock.unlock()
     }
 
     var didStopCallback: ((Error?) -> Void)? = nil
@@ -296,7 +347,11 @@ class ServerConnection {
                 return
             }
 
-            let length: Int = Int(CFSwapInt32(data!.uint32))
+            guard let data = data else {
+                self.connectionDidEnd()
+                return
+            }
+            let length: Int = Int(CFSwapInt32(data.uint32))
             self.connection.receive(minimumIncompleteLength: length, maximumLength: length) { (datain, _, isComplete, error) in
                 if isComplete {
                     self.connectionDidEnd()
@@ -308,8 +363,14 @@ class ServerConnection {
                     return
                 }
 
-                let ref = datain!.prefix(8)
-                let data = datain!.dropFirst(8)
+                guard let datain = datain, datain.count >= 8 else {
+                    print("Bridge: received incomplete data")
+                    self.setupReceive()
+                    return
+                }
+
+                let ref = datain.prefix(8)
+                let data = datain.dropFirst(8)
 
                 guard let json = try? JSONSerialization.jsonObject(with: data, options: []),
                       let array = json as? [Any],
@@ -321,7 +382,9 @@ class ServerConnection {
                 }
 
                 if method == ":loadURL" {
-                    self.bridge.setURL(url: args[1] as! String)
+                    if let urlStr = args[safe: 1] as? String {
+                        self.bridge.setURL(url: urlStr)
+                    }
                 }
                 if method == ":launchDefaultBrowser" {
                     if let urlStr = args[0] as? String {
@@ -393,5 +456,11 @@ extension Data {
             let i32array = self.withUnsafeBytes { $0.load(as: UInt32.self) }
             return i32array
         }
+    }
+}
+
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        return indices.contains(index) ? self[index] : nil
     }
 }
