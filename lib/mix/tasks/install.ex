@@ -266,14 +266,20 @@ defmodule Mix.Tasks.Desktop.Install do
           adapter: Ecto.Adapters.SQLite3
 
           def migration do
-            migrations()
-            |> Enum.sort_by(&elem(&1, 0))
-            |> Enum.each(fn {version, mod} ->
-              Ecto.Migrator.up(__MODULE__, version, mod)
-            end)
+            migrations_path = Application.app_dir(:#{app_name}, "priv/repo/migrations")
+
+            if File.dir?(migrations_path) do
+              Ecto.Migrator.run(__MODULE__, migrations_path, :up, all: true)
+            else
+              compiled_migrations()
+              |> Enum.sort_by(&elem(&1, 0))
+              |> Enum.each(fn {version, mod} ->
+                Ecto.Migrator.up(__MODULE__, version, mod)
+              end)
+            end
           end
 
-          defp migrations do
+          defp compiled_migrations do
             {:ok, modules} = :application.get_key(:#{app_name}, :modules)
             Enum.filter(modules, fn mod ->
               Atom.to_string(mod) |> String.contains?("#{app_namespace}.Migrations.")
