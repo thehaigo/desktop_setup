@@ -50,6 +50,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        // Disconnect LiveView WebSocket when the activity is no longer visible.
+        // Uses onStop instead of onPause to avoid unnecessary disconnections
+        // during multi-window, notification shade, or picture-in-picture.
+        if (::bridge.isInitialized) {
+            bridge.suspendWebSocket()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Reconnect LiveView WebSocket when the activity becomes visible.
+        // The TCP Bridge connection stays alive on Android, so we only
+        // need to re-establish the LiveView WebSocket.
+        if (::bridge.isInitialized) {
+            bridge.reconnectWebSocket()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (::bridge.isInitialized) {
+            bridge.dispose()
+        }
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_BACK) {
             if (webView.canGoBack()) {

@@ -18,12 +18,18 @@ struct TemplateApp: App {
             switch phase {
             case .background:
                 print(".background")
+                // Proactively disconnect LiveView WebSocket before iOS
+                // freezes the network. This prevents the LiveView JS from
+                // firing reconnection attempts while the app is suspended.
+                if let bridge = Bridge.instance {
+                    bridge.suspendWebSocket()
+                }
             case .active:
                 print(".active")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    if let bridge = Bridge.instance {
-                        bridge.reinit()
-                    }
+                // Re-establish Bridge TCP connection and then reconnect
+                // LiveView WebSocket only after the server is ready.
+                if let bridge = Bridge.instance {
+                    bridge.reinit()
                 }
 
             default: break

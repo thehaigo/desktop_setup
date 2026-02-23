@@ -6,9 +6,8 @@ defmodule Mix.Tasks.Desktop.Migrations.Convert do
   @migrations_priv "priv/repo/migrations"
 
   def run(_args) do
-    %{
-      app_name: app_name
-    } = Util.get_host_project_config([])
+    config = DesktopSetup.Util.get_host_project_config([])
+    %{app_name: app_name} = config
 
     migrations_lib = "lib/#{app_name}/migrations"
 
@@ -19,7 +18,7 @@ defmodule Mix.Tasks.Desktop.Migrations.Convert do
     @migrations_priv
     |> Path.join("*.exs")
     |> Path.wildcard()
-    |> Enum.each(&convert/1)
+    |> Enum.each(&convert(&1, config))
 
     System.cmd("mix", ["format", "lib/#{app_name}/migrations/*"])
     Mix.shell().info("Done!")
@@ -28,12 +27,7 @@ defmodule Mix.Tasks.Desktop.Migrations.Convert do
   # -----------------------------
   # Convert a single migration file
   # -----------------------------
-  defp convert(path) do
-    %{
-      app_name: app_name,
-      app_namespace: app_namespace
-    } = Util.get_host_project_config([])
-
+  defp convert(path, %{app_name: app_name, app_namespace: app_namespace}) do
     filename = Path.basename(path, ".exs")
     # Example: 20230729012345_create_books
     [version_str | name_parts] = String.split(filename, "_")
@@ -64,11 +58,19 @@ defmodule Mix.Tasks.Desktop.Migrations.Convert do
 
   # -----------------------------
   # Extract change block
+  # Greedy match to handle nested `end` keywords (e.g. `create table ... end`)
   # -----------------------------
   defp extract_change_block(src) do
-    case Regex.run(~r/def change do(.+?)end/s, src, capture: :all_but_first) do
-      [block] -> String.trim(block)
-      _ -> raise "Could not extract change block:\n\n#{src}"
+    case Regex.run(~r/def change do\n(.+)\n  end/s, src, capture: :all_but_first) do
+      [block] ->
+        String.trim(block)
+
+      _ ->
+        # Fallback for single-line or differently indented files
+        case Regex.run(~r/def change do(.+)end/s, src, capture: :all_but_first) do
+          [block] -> String.trim(block)
+          _ -> raise "Could not extract change block:\n\n#{src}"
+        end
     end
   end
 
@@ -76,6 +78,14 @@ defmodule Mix.Tasks.Desktop.Migrations.Convert do
   # Generate module
   # -----------------------------
   defp migration_module_template(module_name, version, change_block) do
+    # Make DDL idempotent for mobile: create → create_if_not_exists
+    # Prevents "table already exists" crashes when schema_migrations
+    # was not recorded due to a previous crash or app update.
+    safe_block =
+      change_block
+      |> String.replace("create table(", "create_if_not_exists table(")
+      |> String.replace("create index(", "create_if_not_exists index(")
+
     """
     defmodule #{module_name} do
       use Ecto.Migration
@@ -84,9 +94,8 @@ defmodule Mix.Tasks.Desktop.Migrations.Convert do
       def version, do: @version
 
       def change do
-    #{indent(change_block, 2)}
+    #{indent(safe_block, 2)}
       end
-    end
     end
     """
   end

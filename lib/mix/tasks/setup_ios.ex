@@ -11,7 +11,7 @@ defmodule Mix.Tasks.Desktop.Setup.Ios do
 
     desktop_install_config() |> prompt_task_settings()
     Owl.IO.puts([Owl.Data.tag("* generating ", :green), "iOS project files"])
-    host_project_config = Util.get_host_project_config(parsed_args)
+    host_project_config = DesktopSetup.Util.get_host_project_config(parsed_args)
 
     if !File.exists?(host_project_config.native_path <> "/ios") do
       make_native_project_dir(host_project_config)

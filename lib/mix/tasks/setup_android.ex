@@ -9,7 +9,7 @@ defmodule Mix.Tasks.Desktop.Setup.Android do
     {parsed_args, _, _} =
       OptionParser.parse(args, strict: [host_project_config: :string, task_settings: :string])
 
-    host_project_config = Util.get_host_project_config(parsed_args)
+    host_project_config = DesktopSetup.Util.get_host_project_config(parsed_args)
     Owl.IO.puts([Owl.Data.tag("* generating ", :green), "Android project files"])
 
     if !File.exists?(host_project_config.native_path <> "/android") do

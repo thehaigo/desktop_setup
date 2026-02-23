@@ -1,52 +1,40 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 # Setting up the PATH environment
-[ -s /opt/homebrew/bin/brew ] && eval $(/opt/homebrew/bin/brew shellenv)
-[ -s /usr/local/bin/brew ] && eval $(/usr/local/bin/brew shellenv)
+[ -s /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
+[ -s /usr/local/bin/brew ] && eval "$(/usr/local/bin/brew shellenv)"
 
-# This loads nvm
+# This loads nvm (for users managing Node.js via nvm)
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-# This loads asdf
-if [ -s "$HOMEBREW_PREFIX/opt/asdf/libexec/asdf.sh" ]; then 
-  \. "$HOMEBREW_PREFIX/opt/asdf/libexec/asdf.sh" 
-elif [ -s "$HOME/.asdf/asdf.sh" ]; then
-  \. "$HOME/.asdf/asdf.sh"
-fi
+# This loads mise (.tool-versions specifies erlang/elixir versions)
+eval "$(mise activate bash)"
 
-
-BASE=`pwd`
+BASE="$(pwd)"
 export MIX_ENV=prod
 export MIX_TARGET=ios
 
-mix local.hex --force --if-missing
-mix local.rebar --force --if-missing
-
-
 cd ../../
 
-
-asdf set erlang 27.3.4
-asdf set elixir 1.19.3-otp-27
-
+mix local.hex --force --if-missing
+mix local.rebar --force --if-missing
 
 if [ ! -d "deps/desktop" ]; then
   mix deps.get
 fi
 
-#if [ ! -d "assets/node_modules" ]; then
-#  cd assets && npm i && cd ..
-#fi
-
 if [ -f "$BASE/TemplateApp/app.zip" ]; then
   rm "$BASE/TemplateApp/app.zip"
 fi
 
+if grep -q ":ecto_sqlite3" mix.exs; then
+  mix desktop.migrations.convert
+fi
 
-  mix release --overwrite && \
-  mix assets.deploy && \
-  cd _build/ios_prod/rel/template_app && \
-  zip -9r "$BASE/TemplateApp/app.zip" lib/ releases/ --exclude "*.so"  
+mix release --overwrite
+mix assets.deploy
 
+cd "_build/ios_prod/rel/template_app"
+zip -9r "$BASE/TemplateApp/app.zip" lib/ releases/ --exclude "*.so"

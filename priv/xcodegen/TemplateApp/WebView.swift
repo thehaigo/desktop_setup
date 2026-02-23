@@ -11,7 +11,7 @@ import SwiftUI
 import UIKit
 import WebKit
 
-final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+final class WebView: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     var webview: WKWebView
     var finish: (() -> ())?
     
@@ -36,6 +36,9 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         super.init()
         
         configuration.userContentController.add(self, name: "openSafari")
+        configuration.userContentController.add(self, name: "consoleLog")
+        configuration.userContentController.add(self, name: "error")
+        configuration.userContentController.add(self, name: "forceReconnect")
 
         // fixing the zoom level
         addScript(configuration, "var meta = document.createElement('meta');" +
@@ -44,60 +47,46 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
             "var head = document.getElementsByTagName('head')[0];" +
             "head.appendChild(meta);")
         
-        // adding debug output
-        addScript(configuration, "window.onerror = (msg, url, line, column, error) => { " +
-          "const message = {" +
-          "  message: msg," +
-          "  url: url," +
-          "  line: line," +
-          "  column: column," +
-          "  error: JSON.stringify(error)" +
-          "}" +
-          "if (window.webkit) {" +
-          "  window.webkit.messageHandlers.error.postMessage(message);" +
-          "}" +
-          "};")
-        configuration.userContentController.add(self, name: "error")
-        configuration.userContentController.add(self, name: "forceReconnect")
-        configuration.userContentController.add(self, name: "consoleLog")
-
-        // console.log/warn/error render native
+        // Forward JS console messages to Xcode console
         addScript(configuration, """
             (function() {
-                var originalLog = console.log;
-                var originalWarn = console.warn;
-                var originalError = console.error;
-
-                console.log = function() {
-                    originalLog.apply(console, arguments);
+                const levels = ['log', 'warn', 'error', 'info', 'debug'];
+                levels.forEach(function(level) {
+                    const original = console[level];
+                    console[level] = function() {
+                        const args = Array.prototype.slice.call(arguments).map(function(arg) {
+                            try { return typeof arg === 'object' ? JSON.stringify(arg) : String(arg); }
+                            catch(e) { return String(arg); }
+                        });
+                        if (window.webkit && window.webkit.messageHandlers.consoleLog) {
+                            window.webkit.messageHandlers.consoleLog.postMessage(
+                                { level: level, message: args.join(' ') }
+                            );
+                        }
+                        original.apply(console, arguments);
+                    };
+                });
+                window.onerror = function(msg, url, line, column, error) {
                     if (window.webkit && window.webkit.messageHandlers.consoleLog) {
-                        window.webkit.messageHandlers.consoleLog.postMessage('[LOG] ' + Array.from(arguments).join(' '));
-                    }
-                };
-                console.warn = function() {
-                    originalWarn.apply(console, arguments);
-                    if (window.webkit && window.webkit.messageHandlers.consoleLog) {
-                        window.webkit.messageHandlers.consoleLog.postMessage('[WARN] ' + Array.from(arguments).join(' '));
-                    }
-                };
-                console.error = function() {
-                    originalError.apply(console, arguments);
-                    if (window.webkit && window.webkit.messageHandlers.consoleLog) {
-                        window.webkit.messageHandlers.consoleLog.postMessage('[ERROR] ' + Array.from(arguments).join(' '));
+                        window.webkit.messageHandlers.consoleLog.postMessage(
+                            { level: 'error', message: msg + ' (' + url + ':' + line + ':' + column + ')' }
+                        );
                     }
                 };
             })();
         """)
-
+        
+        
         // fixing the onlick event
         // https://stackoverflow.com/a/27525707
         addScript(configuration, """
-            document.getElementsByTagName('a').forEach(node => {
+            document.querySelectorAll('a').forEach(node => {
                 node.style.cursor = "pointer";
             })
         """)
         
         webview.navigationDelegate = self
+        webview.uiDelegate = self
     }
     
     func addScript(_ config: WKWebViewConfiguration, _ script: String) {
@@ -108,6 +97,16 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     func onFinish(finish: @escaping () -> ()) {
         self.finish = finish
     }
+
+    func evaluateJavaScript(_ script: String) {
+        DispatchQueue.main.async { [weak self] in
+            self?.webview.evaluateJavaScript(script) { _, error in
+                if let error = error {
+                    print("JS evaluation error: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
     
     func webView(_ webView: WKWebView,
                           didFinish navigation: WKNavigation!) {
@@ -116,13 +115,80 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         }
     }
     
+    // MARK: - WKUIDelegate (JS alert / confirm / prompt)
+
+    func webView(_ webView: WKWebView,
+                 runJavaScriptAlertPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping () -> Void) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            completionHandler()
+        })
+        topViewController()?.present(alert, animated: true)
+    }
+
+    func webView(_ webView: WKWebView,
+                 runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (Bool) -> Void) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+            completionHandler(false)
+        })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            completionHandler(true)
+        })
+        topViewController()?.present(alert, animated: true)
+    }
+
+    func webView(_ webView: WKWebView,
+                 runJavaScriptTextInputPanelWithPrompt prompt: String,
+                 defaultText: String?,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (String?) -> Void) {
+        let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.text = defaultText
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+            completionHandler(nil)
+        })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            completionHandler(alert.textFields?.first?.text)
+        })
+        topViewController()?.present(alert, animated: true)
+    }
+
+    /// Find the topmost presented view controller to present alerts on.
+    private func topViewController() -> UIViewController? {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              var vc = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
+            return nil
+        }
+        while let presented = vc.presentedViewController {
+            vc = presented
+        }
+        return vc
+    }
+
+    // MARK: - WKScriptMessageHandler
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         switch message.name {
         case "openSafari":
-            print(message.body)
-            let url = URL(string:message.body as! String)
-            if( UIApplication.shared.canOpenURL(url!) ) {
-              UIApplication.shared.open(url!)
+            if let urlString = message.body as? String, let url = URL(string: urlString) {
+                if UIApplication.shared.canOpenURL(url) {
+                    UIApplication.shared.open(url)
+                }
+            }
+        case "consoleLog":
+            if let body = message.body as? [String: Any],
+               let level = body["level"] as? String,
+               let msg = body["message"] as? String {
+                if level == "error" || level == "warn" {
+                    print("JS [\(level)] \(msg)")
+                }
             }
         case "error":
             // You should actually handle the error :)
@@ -139,12 +205,8 @@ final class WebView: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
                     self.webview.reload()
                 }
             }
-        case "consoleLog":
-            if let logMessage = message.body as? String {
-                print("[JS] \(logMessage)")
-            }
         default:
-            assertionFailure("Received invalid message: \(message.name)")
+            print("WebView: received unknown message: \(message.name)")
         }
     }
 

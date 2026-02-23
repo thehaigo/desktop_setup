@@ -2,6 +2,7 @@ package com.example.template_app
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -10,19 +11,21 @@ import android.os.Build
 import android.os.Message
 import android.system.Os
 import android.util.Log
+import android.webkit.ConsoleMessage
+import android.webkit.JsPromptResult
+import android.webkit.JsResult
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.EditText
 import androidx.core.content.FileProvider
 import org.json.JSONArray
-import org.json.JSONObject
 import java.net.ServerSocket
 import kotlin.concurrent.thread
 import java.io.*
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import java.util.zip.ZipInputStream
 import androidx.core.net.toUri
@@ -38,19 +41,9 @@ class Bridge(
 
     private val server = ServerSocket(0)
     private var lastURL = String()
-    private val assets = applicationContext.assets.list("")
-    private var writers = ArrayList<DataOutputStream>()
+    private val assets = applicationContext.assets.list("") ?: emptyArray()
     private val writerLock = ReentrantLock()
 
-    class Notification {
-        var title = String()
-        var message = String()
-        var callback = 0uL
-        var pid = JSONObject()
-        var obj = JSONArray()
-    }
-
-    private val notifications = ConcurrentHashMap<ULong, Notification>()
 
     init {
         Os.setenv("ELIXIR_DESKTOP_OS", "android", false)
@@ -61,26 +54,24 @@ class Bridge(
         setWebView(webview)
 
         thread(start = true) {
-            while (true) {
-                val socket = server.accept()
-                socket.tcpNoDelay = true
-                println("Client connected: ${socket.inetAddress.hostAddress}")
-                thread {
-                    val reader = DataInputStream(BufferedInputStream((socket.getInputStream())))
-                    val writer = DataOutputStream(socket.getOutputStream())
-                    writerLock.lock()
-                    writers.add(writer)
-                    writerLock.unlock()
-                    try {
-                        handle(reader, writer)
-                    } catch(e : EOFException) {
-                        println("Client disconnected: ${socket.inetAddress.hostAddress}")
-                        socket.close()
+            try {
+                while (!server.isClosed) {
+                    val socket = server.accept()
+                    socket.tcpNoDelay = true
+                    Log.d("Bridge", "Client connected: ${socket.inetAddress.hostAddress}")
+                    thread {
+                        val reader = DataInputStream(BufferedInputStream((socket.getInputStream())))
+                        val writer = DataOutputStream(socket.getOutputStream())
+                        try {
+                            handle(reader, writer)
+                        } catch(e : EOFException) {
+                            Log.d("Bridge", "Client disconnected: ${socket.inetAddress.hostAddress}")
+                            socket.close()
+                        }
                     }
-                    writerLock.lock()
-                    writers.remove(writer)
-                    writerLock.unlock()
                 }
+            } catch (e: java.net.SocketException) {
+                Log.d("Bridge", "Server socket closed: ${e.message}")
             }
         }
 
@@ -105,7 +96,6 @@ class Bridge(
         }
 
         val runtime = "$prefix-runtime"
-        Log.d("RUNTIME", runtime)
 
         thread(start = true) {
             val packageInfo = applicationContext.packageManager
@@ -163,7 +153,6 @@ class Bridge(
                     ?.forEach { file ->
                         var name = File(file).name
                         name = name.substring(5, name.length - 3)
-                        Log.d("BIN", "$nativeDir/$file -> $binDir/$name")
                         File("$binDir/$name").delete()
                         Os.symlink("$nativeDir/$file", "$binDir/$name")
                     }
@@ -185,11 +174,6 @@ class Bridge(
 
 
     private fun unpackAsset(releaseDir: String, assetName: String): Boolean {
-        assets!!
-        //if (assets.contains("$assetName.zip.xz")) {
-        //    val input = BufferedInputStream(applicationContext.assets.open("$assetName.zip.xz"))
-        //    return unpackZip(releaseDir, XZInputStream(input))
-        //}
         if (assets.contains("$assetName.zip")) {
             val input = BufferedInputStream(applicationContext.assets.open("$assetName.zip"))
             return unpackZip(releaseDir, input)
@@ -198,7 +182,6 @@ class Bridge(
     }
 
     private fun unpackZip(releaseDir: String, inputStream: InputStream): Boolean {
-        Log.d("RELEASEDIR", releaseDir)
         File(releaseDir).mkdirs()
         try
         {
@@ -214,14 +197,12 @@ class Bridge(
                 // it will generate an Exception...
                 val fullpath = "$releaseDir/$filename"
                 if (ze.isDirectory) {
-                    Log.d("DIR", fullpath)
                     File(fullpath).mkdirs()
                     zis.closeEntry()
                     ze =  zis.nextEntry
                     continue
                 }
 
-                Log.d("FILE", fullpath)
                 val fout = FileOutputStream(fullpath)
                 var count = zis.read(buffer)
                 while (count != -1) {
@@ -313,12 +294,114 @@ class Bridge(
                 }
                 return true
             }
+
+            override fun onJsAlert(
+                view: WebView?, url: String?, message: String?, result: JsResult?
+            ): Boolean {
+                AlertDialog.Builder(activity)
+                    .setMessage(message)
+                    .setPositiveButton("OK") { _, _ -> result?.confirm() }
+                    .setOnCancelListener { result?.cancel() }
+                    .show()
+                return true
+            }
+
+            override fun onJsConfirm(
+                view: WebView?, url: String?, message: String?, result: JsResult?
+            ): Boolean {
+                AlertDialog.Builder(activity)
+                    .setMessage(message)
+                    .setPositiveButton("OK") { _, _ -> result?.confirm() }
+                    .setNegativeButton("Cancel") { _, _ -> result?.cancel() }
+                    .setOnCancelListener { result?.cancel() }
+                    .show()
+                return true
+            }
+
+            override fun onJsPrompt(
+                view: WebView?, url: String?, message: String?,
+                defaultValue: String?, result: JsPromptResult?
+            ): Boolean {
+                val input = EditText(activity).apply { setText(defaultValue) }
+                AlertDialog.Builder(activity)
+                    .setMessage(message)
+                    .setView(input)
+                    .setPositiveButton("OK") { _, _ -> result?.confirm(input.text.toString()) }
+                    .setNegativeButton("Cancel") { _, _ -> result?.cancel() }
+                    .setOnCancelListener { result?.cancel() }
+                    .show()
+                return true
+            }
+
+            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                consoleMessage?.let {
+                    val level = when (it.messageLevel()) {
+                        ConsoleMessage.MessageLevel.ERROR -> "ERROR"
+                        ConsoleMessage.MessageLevel.WARNING -> "WARN"
+                        ConsoleMessage.MessageLevel.DEBUG -> "DEBUG"
+                        else -> "LOG"
+                    }
+                    Log.d("JS", "[$level] ${it.message()} (${it.sourceId()}:${it.lineNumber()})")
+                }
+                return true
+            }
         }
     }
 
 
     fun getLocalPort(): Int {
         return server.localPort
+    }
+
+    /**
+     * Disconnect LiveView WebSocket before going to background.
+     * Prevents LiveView JS from attempting reconnections while
+     * Android has the app in the background with throttled networking.
+     */
+    fun suspendWebSocket() {
+        Log.d("Bridge", "Suspending LiveView WebSocket")
+        webview.post {
+            webview.evaluateJavascript("""
+                (function() {
+                    if (window.__bridgeSuspended) return;
+                    window.__bridgeSuspended = true;
+                    if (window.liveSocket) {
+                        window.liveSocket.disconnect();
+                    }
+                })();
+            """.trimIndent(), null)
+        }
+    }
+
+    /**
+     * Reconnect LiveView WebSocket after returning to foreground.
+     * Polls the Phoenix HTTP server until it responds, then triggers
+     * liveSocket.connect() to avoid "reconnect" / "something went wrong" flashes.
+     */
+    fun reconnectWebSocket() {
+        if (lastURL.isBlank()) {
+            Log.d("Bridge", "No URL to reconnect to")
+            return
+        }
+        Log.d("Bridge", "Triggering LiveView WebSocket reconnect")
+        webview.post {
+            webview.evaluateJavascript("""
+                (function() {
+                    window.__bridgeSuspended = false;
+                    (function reconnectLiveView() {
+                        fetch('$lastURL', {method: 'HEAD', cache: 'no-store'})
+                            .then(function() {
+                                if (window.liveSocket) {
+                                    window.liveSocket.connect();
+                                }
+                            })
+                            .catch(function() {
+                                setTimeout(reconnectLiveView, 200);
+                            });
+                    })();
+                })();
+            """.trimIndent(), null)
+        }
     }
 
     private fun handle(reader : DataInputStream, writer : DataOutputStream) {
@@ -331,8 +414,6 @@ class Bridge(
             reader.readFully(data)
 
             val json = JSONArray(String(data))
-
-            val module = json.getString(0)
             val method = json.getString(1)
             val args = json.getJSONArray(2)
 
@@ -370,24 +451,12 @@ class Bridge(
                 }
             }
             writerLock.lock()
-            writer.writeInt(response.size)
-            writer.write(response)
-            writerLock.unlock()        }
-    }
-
-    fun sendMessage(message : ByteArray) {
-        thread {
-            writerLock.lock()
-            while (writers.isEmpty()) {
+            try {
+                writer.writeInt(response.size)
+                writer.write(response)
+            } finally {
                 writerLock.unlock()
-                Thread.sleep(100)
-                writerLock.lock()
             }
-            for (writer in writers) {
-                writer.writeInt(message.size)
-                writer.write(message)
-            }
-            writerLock.unlock()
         }
     }
 
@@ -400,6 +469,11 @@ class Bridge(
     fun dispose() {
         filePathCallback?.onReceiveValue(null)
         filePathCallback = null
+        try {
+            server.close()
+        } catch (e: Exception) {
+            Log.d("Bridge", "Error closing server socket: ${e.message}")
+        }
     }
 
 
@@ -443,23 +517,6 @@ class Bridge(
         return "[${numbers.joinToString(",")}]"
     }
 
-    private fun listToString(raw : JSONArray): String {
-        var title = ""
-        for (i in 0 until raw.length()) {
-            title += raw.getInt(i).toChar()
-        }
-        return title
-    }
-
-    private fun getKeyword(keywords: JSONArray, searchKey : String) : Any {
-        for (i in 0 until keywords.length()) {
-            val tupleValues = keywords.getJSONObject(i).getJSONArray(":value")
-            val key = tupleValues.getString(0)
-            if (key == searchKey) return tupleValues.get(1)
-        }
-        return ""
-    }
-
     /**
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
@@ -467,9 +524,9 @@ class Bridge(
     private external fun startErlang(releaseDir: String, logdir: String): String
 
     companion object {
-        // Used to load the 'native-lib' library on application startup.
+        // Used to load the 'app' library on application startup.
         init {
-            System.loadLibrary("native-lib")
+            System.loadLibrary("app")
         }
     }
 }

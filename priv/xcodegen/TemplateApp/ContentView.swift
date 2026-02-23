@@ -8,29 +8,67 @@ import UIKit
 import WebKit
 
 struct ContentView: View {
-    @State var isActive : Bool = false
-    @State var webview : WebViewController?
-    
+    @State var isActive: Bool = false
+    @State var webview: WebViewController?
+    @State var errorMessage: String?
+
     var body: some View {
         VStack {
-            if self.isActive {
+            if let error = errorMessage {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.red)
+                    Text("Failed to start")
+                        .font(.headline)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color("SplashBackground"))
+                .ignoresSafeArea()
+            } else if self.isActive {
                 webview!.ignoresSafeArea()
             } else {
-                ZStack {
-                    Color(red: 47/255, green: 36/255, blue: 58/255)
-                        .ignoresSafeArea()
-                }
+                Color("SplashBackground")
+                    .ignoresSafeArea()
             }
         }
-        //.ignoresSafeArea(edges: .top)
         .onAppear {
-            DispatchQueue.main.async {
-                let bridge = try! Bridge()
-                self.webview = WebViewController()
-                self.webview?.webview.onFinish {
-                    self.isActive = true
+            // Bridge init is lightweight (no I/O).
+            // Heavy zip extraction runs on a background thread to
+            // avoid blocking the UI and triggering the watchdog.
+            let bridge: Bridge
+            do {
+                bridge = try Bridge()
+            } catch {
+                print("Bridge init failed: \(error)")
+                self.errorMessage = error.localizedDescription
+                return
+            }
+
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try bridge.extractAppIfNeeded()
+                } catch {
+                    DispatchQueue.main.async {
+                        print("Bridge extract failed: \(error)")
+                        self.errorMessage = error.localizedDescription
+                    }
+                    return
                 }
-                bridge.setWebView(view: self.webview!)
+
+                DispatchQueue.main.async {
+                    bridge.setupListener()
+                    self.webview = WebViewController()
+                    self.webview?.webview.onFinish {
+                        self.isActive = true
+                    }
+                    bridge.setWebView(view: self.webview!)
+                }
             }
         }
     }
