@@ -274,7 +274,13 @@ defmodule Mix.Tasks.Desktop.Install do
               compiled_migrations()
               |> Enum.sort_by(&elem(&1, 0))
               |> Enum.each(fn {version, mod} ->
-                Ecto.Migrator.up(__MODULE__, version, mod)
+                try do
+                  Ecto.Migrator.up(__MODULE__, version, mod)
+                rescue
+                  e ->
+                    require Logger
+                    Logger.warning("Migration \#{inspect(mod)} v\#{version} failed: \#{inspect(e)}")
+                end
               end)
             end
           end

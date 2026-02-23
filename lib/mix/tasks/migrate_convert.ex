@@ -78,6 +78,14 @@ defmodule Mix.Tasks.Desktop.Migrations.Convert do
   # Generate module
   # -----------------------------
   defp migration_module_template(module_name, version, change_block) do
+    # Make DDL idempotent for mobile: create → create_if_not_exists
+    # Prevents "table already exists" crashes when schema_migrations
+    # was not recorded due to a previous crash or app update.
+    safe_block =
+      change_block
+      |> String.replace("create table(", "create_if_not_exists table(")
+      |> String.replace("create index(", "create_if_not_exists index(")
+
     """
     defmodule #{module_name} do
       use Ecto.Migration
@@ -86,9 +94,8 @@ defmodule Mix.Tasks.Desktop.Migrations.Convert do
       def version, do: @version
 
       def change do
-    #{indent(change_block, 2)}
+    #{indent(safe_block, 2)}
       end
-    end
     end
     """
   end
