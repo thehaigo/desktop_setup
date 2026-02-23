@@ -186,7 +186,9 @@ final class WebView: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessa
             if let body = message.body as? [String: Any],
                let level = body["level"] as? String,
                let msg = body["message"] as? String {
-                print("JS [\(level)] \(msg)")
+                if level == "error" || level == "warn" {
+                    print("JS [\(level)] \(msg)")
+                }
             }
         case "error":
             // You should actually handle the error :)
