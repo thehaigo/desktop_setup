@@ -94,6 +94,10 @@ class Bridge {
     }
 
     func setupListener() {
+        if listener != nil {
+            print("Bridge: setupListener skipped — listener already exists")
+            return
+        }
         do {
             let l = try NWListener(using: .tcp, on: Bridge.port())
             l.stateUpdateHandler = self.stateDidChange(to:)
@@ -122,6 +126,11 @@ class Bridge {
     /// After the TCP connection is re-established and the Elixir-side ranch
     /// listener has been resumed, triggers a LiveView reconnect via JS injection.
     func reinit() {
+        // Skip reinit if Erlang hasn't started yet (initial .active on app launch)
+        guard erlangStarted else {
+            print("Bridge: reinit skipped — Erlang not started yet")
+            return
+        }
         guard !isReinitializing else { return }
 
         let needsRestart = connectionsQueue.sync {
@@ -138,13 +147,18 @@ class Bridge {
         if needsRestart {
             isReinitializing = true
             stopListener()
-            setupListener()
 
-            // Wait for the Elixir-side ranch listener to finish suspend/resume,
-            // then reconnect LiveView WebSocket.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-                self?.reconnectWebSocket()
-                self?.isReinitializing = false
+            // Wait for the old listener's port to be fully released,
+            // then create a new one on the same port.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.setupListener()
+
+                // Wait for the Elixir-side ranch listener to finish suspend/resume,
+                // then reconnect LiveView WebSocket.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.reconnectWebSocket()
+                    self?.isReinitializing = false
+                }
             }
         } else {
             reconnectWebSocket()
@@ -186,10 +200,14 @@ class Bridge {
         }
 
         stopListener()
-        setupListener()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.loadURL()
+        // Wait for the old listener's port to be fully released
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.setupListener()
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.loadURL()
+            }
         }
     }
 
