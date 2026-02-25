@@ -255,9 +255,7 @@ defmodule Mix.Tasks.Desktop.Doctor do
     print_section("macOS Tools")
 
     [
-      check_homebrew(),
-      check_wxwidgets(),
-      check_openssl()
+      check_homebrew()
     ]
   end
 
@@ -272,55 +270,6 @@ defmodule Mix.Tasks.Desktop.Doctor do
         version = cmd_output("brew", ["--version"]) |> String.trim() |> String.split("\n") |> hd()
         print_ok("Homebrew", version)
         :ok
-    end
-  end
-
-  defp check_wxwidgets do
-    brew_prefix = get_brew_prefix()
-
-    cond do
-      brew_prefix == nil ->
-        print_fail("wxwidgets@3.2", "Homebrew not available", "brew install wxwidgets@3.2")
-        :fail
-
-      File.exists?(Path.join(brew_prefix, "opt/wxwidgets@3.2")) ->
-        version = cmd_output("brew", ["list", "--versions", "wxwidgets@3.2"]) |> String.trim()
-        v = version |> String.replace("wxwidgets@3.2 ", "")
-        print_ok("wxwidgets@3.2", v)
-        :ok
-
-      true ->
-        # Check if a different wxwidgets version is installed
-        other = cmd_output("brew", ["list", "--versions", "wxwidgets"]) |> String.trim()
-
-        if other != "" do
-          print_warn("wxwidgets@3.2", "#{other} installed but @3.2 is required",
-            "brew install wxwidgets@3.2")
-          :warn
-        else
-          print_fail("wxwidgets@3.2", "not installed", "brew install wxwidgets@3.2")
-          :fail
-        end
-    end
-  end
-
-  defp check_openssl do
-    brew_prefix = get_brew_prefix()
-
-    cond do
-      brew_prefix == nil ->
-        print_fail("openssl@3", "Homebrew not available", "brew install openssl@3")
-        :fail
-
-      File.exists?(Path.join(brew_prefix, "opt/openssl@3")) ->
-        version = cmd_output("brew", ["list", "--versions", "openssl@3"]) |> String.trim()
-        v = version |> String.replace("openssl@3 ", "")
-        print_ok("openssl@3", v)
-        :ok
-
-      true ->
-        print_fail("openssl@3", "not installed", "brew install openssl@3")
-        :fail
     end
   end
 
@@ -525,13 +474,6 @@ defmodule Mix.Tasks.Desktop.Doctor do
     Enum.find(candidates, &File.exists?/1)
   end
 
-  defp get_brew_prefix do
-    case System.find_executable("brew") do
-      nil -> nil
-      _path ->
-        cmd_output("brew", ["--prefix"]) |> String.trim()
-    end
-  end
 
   defp cmd_output(cmd, args) do
     case System.find_executable(cmd) do

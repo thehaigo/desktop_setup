@@ -7,11 +7,9 @@ Setup library for [ElixirDesktop](https://github.com/elixir-desktop/desktop) —
 - **Erlang/OTP 28** and **Elixir 1.19** (managed via [mise](https://mise.jdx.dev/))
 - **macOS** for iOS builds; macOS or Linux for Android builds
 
-### Common (macOS)
+### Common
 
 ```bash
-brew install wxwidgets@3.2 openssl@3
-export KERL_CONFIGURE_OPTIONS="--without-javac --with-ssl=$(brew --prefix openssl@3) --with-wx-config=$(brew --prefix wxwidgets@3.2)/bin/wx-config-3.2"
 mise install erlang@28.3.1
 mise install elixir@1.19.5-otp-28
 ```
